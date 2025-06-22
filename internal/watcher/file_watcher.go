@@ -10,27 +10,30 @@ import (
 
 // FileWatcher monitors a file for changes and triggers a callback.
 type FileWatcher struct {
-	FilePath     string
-	SyncInterval time.Duration
-	DebounceTime time.Duration
-	OnChangeFunc func() error
-	watcher      *fsnotify.Watcher
-	done         chan bool
+	FilePath        string
+	SyncInterval    time.Duration
+	DebounceTime    time.Duration
+	OnChangeFunc    func() error // Called when file changes (push)
+	OnPeriodicFunc  func() error // Called on periodic intervals (pull)
+	watcher         *fsnotify.Watcher
+	done            chan bool
+	lastPullTime    time.Time     // Timestamp of last pull operation
 }
 
 // NewFileWatcher creates a new file watcher instance.
-func NewFileWatcher(filePath string, syncInterval, debounceTime time.Duration, onChange func() error) (*FileWatcher, error) {
+func NewFileWatcher(filePath string, syncInterval, debounceTime time.Duration, onChange func() error, onPeriodic func() error) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 	return &FileWatcher{
-		FilePath:     filePath,
-		SyncInterval: syncInterval,
-		DebounceTime: debounceTime,
-		OnChangeFunc: onChange,
-		watcher:      watcher,
-		done:         make(chan bool),
+		FilePath:       filePath,
+		SyncInterval:   syncInterval,
+		DebounceTime:   debounceTime,
+		OnChangeFunc:   onChange,
+		OnPeriodicFunc: onPeriodic,
+		watcher:        watcher,
+		done:           make(chan bool),
 	}, nil
 }
 
@@ -44,7 +47,7 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 		return err
 	}
 
-	utils.PrintInfo("Watching for changes to %s...\n", w.FilePath)
+	utils.PrintInfo("🔍 File changes to %s will be automatically pushed to Azure Key Vault.\n", w.FilePath)
 
 	var lastChange time.Time
 	ticker := time.NewTicker(w.SyncInterval)
@@ -53,7 +56,7 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			utils.PrintInfo("Stopping watcher...\n")
+			utils.PrintInfo("🛑 Stopping watcher...\n")
 			return nil
 		case event, ok := <-w.watcher.Events:
 			if !ok {
@@ -61,10 +64,15 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 			}
 			// We only care about writes and creates
 			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+				// Skip file changes that happen within 10 seconds of a pull operation
+				// This prevents the pull from triggering a push
+				if time.Since(w.lastPullTime) < 10*time.Second {
+					continue
+				}
 				if time.Since(lastChange) > w.DebounceTime {
-					utils.PrintInfo("Change detected in %s, syncing...\n", w.FilePath)
+					utils.PrintInfo("📝 Change detected in %s, pushing to remote...\n", w.FilePath)
 					if err := w.OnChangeFunc(); err != nil {
-						utils.PrintError("Error during sync: %v\n", err)
+						utils.PrintError("❌ Error during push: %v\n", err)
 					}
 					lastChange = time.Now()
 				}
@@ -73,11 +81,12 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
-			utils.PrintError("Watcher error: %v\n", err)
+			utils.PrintError("❌ Watcher error: %v\n", err)
 		case <-ticker.C:
-			utils.PrintInfo("Periodic sync triggered...\n")
-			if err := w.OnChangeFunc(); err != nil {
-				utils.PrintError("Error during periodic sync: %v\n", err)
+			// Record pull time before and after pull operation
+			w.lastPullTime = time.Now()
+			if err := w.OnPeriodicFunc(); err != nil {
+				utils.PrintError("❌ Error during periodic pull: %v\n", err)
 			}
 		}
 	}

@@ -128,14 +128,14 @@ func runSpecificCheck(component string, autoFix bool) error {
 
 // Helper functions for specific checks
 func checkAzureCLI(autoFix bool) error {
-	utils.PrintInfo("Checking Azure CLI...\n")
+	utils.PrintInfo("🔍 Checking Azure CLI...\n")
 	dm, _ := deps.NewDependencyManager()
 	missing, _ := dm.CheckDependencies()
 	
 	for _, dep := range missing {
 		if dep.Command == "az" {
 			if autoFix {
-				utils.PrintInfo("Installing Azure CLI...\n")
+				utils.PrintInfo("📦 Installing Azure CLI...\n")
 				return dm.InstallDependency(dep)
 			}
 			utils.PrintError("❌ Azure CLI not found\n")
@@ -147,14 +147,14 @@ func checkAzureCLI(autoFix bool) error {
 }
 
 func checkTilt(autoFix bool) error {
-	utils.PrintInfo("Checking Tilt...\n")
+	utils.PrintInfo("🔍 Checking Tilt...\n")
 	dm, _ := deps.NewDependencyManager()
 	missing, _ := dm.CheckDependencies()
 	
 	for _, dep := range missing {
 		if dep.Command == "tilt" {
 			if autoFix {
-				utils.PrintInfo("Installing Tilt...\n")
+				utils.PrintInfo("📦 Installing Tilt...\n")
 				return dm.InstallDependency(dep)
 			}
 			utils.PrintWarning("⚠️ Tilt not found (optional)\n")
@@ -166,10 +166,10 @@ func checkTilt(autoFix bool) error {
 }
 
 func checkAuth(autoFix bool) error {
-	utils.PrintInfo("Checking Azure authentication...\n")
+	utils.PrintInfo("🔍 Checking Azure authentication...\n")
 	if err := auth.CheckAzLoginStatus(); err != nil {
 		if autoFix {
-			utils.PrintInfo("Running 'az login'...\n")
+			utils.PrintInfo("🚀 Running 'az login'...\n")
 			return auth.EnsureAzureAuth(false)
 		}
 		utils.PrintError("❌ Azure authentication failed\n")
@@ -180,11 +180,11 @@ func checkAuth(autoFix bool) error {
 }
 
 func checkConfig(autoFix bool) error {
-	utils.PrintInfo("Checking configuration...\n")
+	utils.PrintInfo("🔍 Checking configuration...\n")
 	_, err := config.LoadConfig(cfgFile)
 	if err != nil {
 		if autoFix {
-			utils.PrintInfo("Configuration issues cannot be auto-fixed. Please run 'env-sync init'\n")
+			utils.PrintInfo("⚙️ Configuration issues cannot be auto-fixed. Please run 'env-sync init'\n")
 		}
 		utils.PrintError("❌ Configuration issue: %v\n", err)
 		return err
@@ -246,12 +246,12 @@ func installSpecificDependency(depName string, yes bool) error {
 			if !yes && dep.Required == false {
 				// Prompt for optional dependencies
 				if !deps.PromptInstallDependencies([]deps.Dependency{dep}) {
-					utils.PrintInfo("Skipping installation of %s\n", dep.Name)
+					utils.PrintInfo("⏭️ Skipping installation of %s\n", dep.Name)
 					return nil
 				}
 			}
 			
-			utils.PrintInfo("Installing %s...\n", dep.Name)
+			utils.PrintInfo("📦 Installing %s...\n", dep.Name)
 			return dm.InstallDependency(dep)
 		}
 	}
@@ -280,7 +280,7 @@ You must provide the Azure Key Vault URL, a name for the secret, and a source fo
 			return fmt.Errorf("--vault-url, --secret-name, and --key-source are required")
 		}
 
-		utils.PrintInfo("Initializing env-sync configuration...\n")
+		utils.PrintInfo("🚀 Initializing env-sync configuration...\n")
 
 		// 1. Create credential and vault client to test connectivity
 		cred, err := auth.CreateAzureCredential()
@@ -288,7 +288,7 @@ You must provide the Azure Key Vault URL, a name for the secret, and a source fo
 			return fmt.Errorf("failed to create Azure credentials during init: %w", err)
 		}
 		if !auth.IsAuthenticated(cred) {
-			utils.PrintError("Azure authentication failed. Please run 'az login' and try again.\n")
+			utils.PrintError("❌ Azure authentication failed. Please run 'az login' and try again.\n")
 			auth.PrintAuthHelp()
 			return fmt.Errorf("authentication required")
 		}
@@ -337,9 +337,9 @@ You must provide the Azure Key Vault URL, a name for the secret, and a source fo
 		}
 
 		utils.PrintSuccess("🎉 Configuration file '.env-sync.yaml' created successfully!\n")
-		utils.PrintInfo("Next steps:\n")
-		utils.PrintInfo("  1. Ensure your .env file is present or create one.\n")
-		utils.PrintInfo("  2. Run 'env-sync push' to upload your .env file to Azure Key Vault.\n")
+		utils.PrintInfo("📋 Next steps:\n")
+		utils.PrintInfo("  1️⃣ Ensure your .env file is present or create one.\n")
+		utils.PrintInfo("  2️⃣ Run 'env-sync push' to upload your .env file to Azure Key Vault.\n")
 		return nil
 	},
 }
@@ -447,7 +447,7 @@ Examples:
 			for _, dep := range missing {
 				utils.PrintWarning("  - %s (%s)\n", dep.Name, dep.Command)
 			}
-			utils.PrintInfo("-> To fix, run: env-sync install-deps\n")
+			utils.PrintInfo("🔧 To fix, run: env-sync install-deps\n")
 			fixableIssues = append(fixableIssues, "dependencies")
 		} else {
 			utils.PrintSuccess("✅ All %d dependencies are installed.\n", len(installed))
@@ -510,55 +510,49 @@ var pushCmd = &cobra.Command{
 	Short: "Encrypt and push the local .env file to Azure Key Vault",
 	Long: `Encrypts the local .env file using the configured encryption key and
 uploads it as a new secret version to the specified Azure Key Vault.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(cfgFile)
 		if err != nil {
-			utils.PrintError("Failed to load configuration: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load configuration: %w", err)
 		}
 
 		// Read the .env file
 		envData, err := os.ReadFile(cfg.EnvFile)
 		if err != nil {
-			utils.PrintError("Failed to read .env file from '%s': %v\n", cfg.EnvFile, err)
-			os.Exit(1)
+			return fmt.Errorf("failed to read .env file from '%s': %w", cfg.EnvFile, err)
 		}
 
 		// Get the encryption key
 		key, err := cfg.LoadAndValidateKey(cliKey)
 		if err != nil {
-			utils.PrintError("Failed to load encryption key: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to load encryption key: %w", err)
 		}
 
 		// Encrypt the .env file content
 		encrypted, err := crypto.EncryptEnvContent(envData, key)
 		if err != nil {
-			utils.PrintError("Failed to encrypt .env file: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to encrypt .env file: %w", err)
 		}
 
 		// Create Azure credentials
 		cred, err := auth.CreateAzureCredential()
 		if err != nil {
-			utils.PrintError("Failed to create Azure credentials: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to create Azure credentials: %w", err)
 		}
 
 		// Store the encrypted content in Azure Key Vault
 		vaultClient, err := vault.NewClient(cfg.VaultURL, cred)
 		if err != nil {
-			utils.PrintError("Failed to create Key Vault client: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to create Key Vault client: %w", err)
 		}
 
-		utils.PrintInfo("Pushing encrypted content to Azure Key Vault...\n")
+		utils.PrintInfo("🔒 Pushing encrypted content to Azure Key Vault...\n")
 		if err := vaultClient.StoreSecret(context.Background(), cfg.SecretName, encrypted); err != nil {
-			utils.PrintError("Failed to store secret in Key Vault: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to store secret in Key Vault: %w", err)
 		}
 
-		utils.PrintSuccess("Successfully pushed encrypted .env file to Azure Key Vault.\n")
+		utils.PrintSuccess("✅ Successfully pushed encrypted .env file to Azure Key Vault.\n")
+		return nil
 	},
 }
 
@@ -575,7 +569,7 @@ var pullCmd = &cobra.Command{
 			return err
 		}
 
-		utils.PrintInfo("Pulling secret from %s/%s...\n", cfg.VaultURL, cfg.SecretName)
+		utils.PrintInfo("⬇️  Pulling secret from %s/%s...\n", cfg.VaultURL, cfg.SecretName)
 
 		key, err := cfg.LoadAndValidateKey(cliKey)
 		if err != nil {
@@ -632,7 +626,7 @@ The watcher also performs periodic syncs at a configurable interval.`,
 
 		// Ensure the .env file exists before starting the watcher
 		if _, err := os.Stat(cfg.EnvFile); os.IsNotExist(err) {
-			utils.PrintWarning("'.env' file not found. Creating an empty one to watch.\n")
+			utils.PrintWarning("⚠️ '.env' file not found. Creating an empty one to watch.\n")
 			if err := os.WriteFile(cfg.EnvFile, []byte{}, 0644); err != nil {
 				return fmt.Errorf("failed to create placeholder .env file: %w", err)
 			}
@@ -646,7 +640,7 @@ The watcher also performs periodic syncs at a configurable interval.`,
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		go func() {
 			<-sigChan
-			utils.PrintInfo("\nReceived interrupt signal, shutting down watcher...\n")
+			utils.PrintInfo("🛑 Received interrupt signal, shutting down watcher...\n")
 			cancel()
 		}()
 
@@ -657,6 +651,13 @@ The watcher also performs periodic syncs at a configurable interval.`,
 			return pushCmd_instance.RunE(cmd, args)
 		}
 
+		pullFunc := func() error {
+			// Create a new command to avoid flag parsing issues in a loop
+			pullCmd_instance := &cobra.Command{}
+			*pullCmd_instance = *pullCmd
+			return pullCmd_instance.RunE(cmd, args)
+		}
+
 		// Default debounce and sync intervals if not set
 		debounceTime := 5 * time.Second
 		syncInterval := cfg.SyncInterval
@@ -664,12 +665,12 @@ The watcher also performs periodic syncs at a configurable interval.`,
 			syncInterval = 15 * time.Minute
 		}
 
-		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc)
+		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc, pullFunc)
 		if err != nil {
 			return fmt.Errorf("failed to create file watcher: %w", err)
 		}
 
-		utils.PrintInfo("Starting watcher with a %s sync interval and %s debounce time.\n", syncInterval, debounceTime)
+		utils.PrintInfo("🕐 Starting watcher with a %s pull interval and %s debounce time.\n", syncInterval, debounceTime)
 		return w.Start(ctx)
 	},
 }
@@ -691,7 +692,7 @@ var statusCmd = &cobra.Command{
 	Short: "Show a summary of the current configuration and sync status",
 	Long:  `Displays the current configuration from the .env-sync.yaml file. It also compares the local .env file's modification time with the secret's last updated time in Azure Key Vault to determine sync status.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		utils.PrintInfo("--- env-sync Status ---\n")
+		utils.PrintInfo("📊 --- env-sync Status ---\n")
 		cfg, err := config.LoadConfig(cfgFile)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
@@ -701,7 +702,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		// Print configuration
-		utils.PrintInfo("Configuration loaded from '%s':\n", viper.ConfigFileUsed())
+		utils.PrintInfo("⚙️ Configuration loaded from '%s':\n", viper.ConfigFileUsed())
 		fmt.Printf("  - Vault URL: %s\n", cfg.VaultURL)
 		fmt.Printf("  - Secret Name: %s\n", cfg.SecretName)
 		fmt.Printf("  - Local Env File: %s\n", cfg.EnvFile)
@@ -715,7 +716,7 @@ var statusCmd = &cobra.Command{
 		// Local file info
 		localFileInfo, err := os.Stat(cfg.EnvFile)
 		if os.IsNotExist(err) {
-			utils.PrintWarning("Local .env file not found. Run 'env-sync pull' to fetch it.\n")
+			utils.PrintWarning("⚠️ Local .env file not found. Run 'env-sync pull' to fetch it.\n")
 			return nil
 		} else if err != nil {
 			return fmt.Errorf("could not stat local env file: %w", err)
@@ -732,8 +733,8 @@ var statusCmd = &cobra.Command{
 		}
 		secret, err := vaultClient.GetSecret(context.Background(), cfg.SecretName)
 		if err != nil {
-			utils.PrintWarning("Could not retrieve remote secret. It may not have been pushed yet.\n")
-			utils.PrintInfo("Local file '%s' exists but has not been synced.\n", cfg.EnvFile)
+			utils.PrintWarning("⚠️ Could not retrieve remote secret. It may not have been pushed yet.\n")
+			utils.PrintInfo("📁 Local file '%s' exists but has not been synced.\n", cfg.EnvFile)
 			return nil
 		}
 
@@ -745,8 +746,8 @@ var statusCmd = &cobra.Command{
 
 		fmt.Println("Sync Status:")
 		fmt.Printf("  - Local file last modified: %s\n", localFileInfo.ModTime().Format(time.RFC1123))
-		utils.PrintInfo("  - Remote secret is present in Key Vault.\n")
-		utils.PrintWarning("  - To see if content is in sync, please use a diff tool after pulling.\n")
+		utils.PrintInfo("☁️ Remote secret is present in Key Vault.\n")
+		utils.PrintWarning("⚠️ To see if content is in sync, please use a diff tool after pulling.\n")
 
 		return nil
 	},
@@ -768,7 +769,7 @@ The new key must then be manually distributed to the team.`,
 		}
 
 		// 1. Load the old key from the currently configured source
-		utils.PrintInfo("Loading current (old) encryption key...\n")
+		utils.PrintInfo("🔑 Loading current (old) encryption key...\n")
 		oldKey, err := cfg.LoadAndValidateKey(cliKey) // cliKey will be empty if not passed, respecting priority
 		if err != nil {
 			return fmt.Errorf("could not load the old key from source '%s': %w", cfg.KeySource, err)
@@ -793,7 +794,7 @@ The new key must then be manually distributed to the team.`,
 		utils.PrintSuccess("✅ New key loaded and validated.\n")
 
 		// 3. Fetch the secret from Key Vault
-		utils.PrintInfo("Fetching current secret from Azure Key Vault...\n")
+		utils.PrintInfo("⬇️ Fetching current secret from Azure Key Vault...\n")
 		cred, err := auth.CreateAzureCredential()
 		if err != nil {
 			return err
@@ -809,7 +810,7 @@ The new key must then be manually distributed to the team.`,
 		}
 
 		// 4. Perform the rotation (decrypt with old, encrypt with new)
-		utils.PrintInfo("Re-encrypting secret with the new key...\n")
+		utils.PrintInfo("🔄 Re-encrypting secret with the new key...\n")
 		newEncryptedContent, err := crypto.RotateKey(oldKey, newKey, encryptedContent)
 		if err != nil {
 			return fmt.Errorf("key rotation failed during re-encryption: %w", err)
@@ -821,8 +822,8 @@ The new key must then be manually distributed to the team.`,
 		}
 
 		utils.PrintSuccess("\n🎉 Key rotated successfully in Azure Key Vault!\n")
-		utils.PrintWarning("IMPORTANT: You must now securely distribute the new key to your team.\n")
-		utils.PrintInfo("They will need to update their key source (e.g., ENVSYNC_ENCRYPTION_KEY) before they can 'pull' again.\n")
+		utils.PrintWarning("🚨 IMPORTANT: You must now securely distribute the new key to your team.\n")
+		utils.PrintInfo("🔧 They will need to update their key source (e.g., ENVSYNC_ENCRYPTION_KEY) before they can 'pull' again.\n")
 		return nil
 	},
 }

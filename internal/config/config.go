@@ -40,7 +40,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found is okay, we'll use defaults or command-line flags.
-			utils.PrintDebug("Config file not found, using defaults.")
+			utils.PrintDebug("📂 Config file not found, using defaults.")
 		} else {
 			// Other errors are fatal.
 			return nil, fmt.Errorf("failed to read config file: %w", err)

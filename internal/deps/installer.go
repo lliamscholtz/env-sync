@@ -32,7 +32,7 @@ type DependencyManager struct {
 func NewDependencyManager() (*DependencyManager, error) {
 	pm, err := getPackageManager()
 	if err != nil {
-		utils.PrintWarning("Could not detect package manager: %v\n", err)
+		utils.PrintWarning("⚠️ Could not detect package manager: %v\n", err)
 	}
 	return &DependencyManager{
 		OS:             runtime.GOOS,
@@ -81,14 +81,14 @@ var dependencies = []Dependency{
 
 // CheckDependencies verifies if all dependencies are installed.
 func (dm *DependencyManager) CheckDependencies() (missing []Dependency, installed []Dependency) {
-	utils.PrintInfo("Checking dependencies...\n")
+	utils.PrintInfo("🔍 Checking dependencies...\n")
 	for _, dep := range dependencies {
 		_, err := exec.LookPath(dep.Command)
 		if err != nil {
-			utils.PrintWarning("-> Missing dependency: %s\n", dep.Name)
+			utils.PrintWarning("❌ Missing dependency: %s\n", dep.Name)
 			missing = append(missing, dep)
 		} else {
-			utils.PrintSuccess("-> Found dependency: %s\n", dep.Name)
+			utils.PrintSuccess("🔍 Found dependency: %s\n", dep.Name)
 			installed = append(installed, dep)
 		}
 	}
@@ -111,7 +111,7 @@ func (dm *DependencyManager) InstallDependency(dep Dependency) error {
 		return fmt.Errorf("package manager '%s' not supported for installing %s on %s. Please install manually from: %s", dm.PackageManager, dep.Name, dm.OS, url)
 	}
 
-	utils.PrintInfo("Attempting to install %s with command: %s\n", dep.Name, cmdStr)
+	utils.PrintInfo("🚀 Attempting to install %s with command: %s\n", dep.Name, cmdStr)
 
 	parts := strings.Fields(cmdStr)
 	cmd := exec.Command(parts[0], parts[1:]...)
@@ -137,7 +137,7 @@ func (dm *DependencyManager) InstallDependency(dep Dependency) error {
 		return fmt.Errorf("installation failed: %w", err)
 	}
 
-	utils.PrintSuccess("%s installed successfully.\n", dep.Name)
+	utils.PrintSuccess("✅ %s installed successfully.\n", dep.Name)
 	return nil
 }
 
@@ -156,14 +156,14 @@ func PromptInstallDependencies(missing []Dependency) bool {
 // InstallAllMissing installs all dependencies that were found to be missing.
 func (dm *DependencyManager) InstallAllMissing(missing []Dependency) error {
 	if len(missing) == 0 {
-		utils.PrintSuccess("All dependencies are already installed.\n")
+		utils.PrintSuccess("✅ All dependencies are already installed.\n")
 		return nil
 	}
 
 	for _, dep := range missing {
 		if err := dm.InstallDependency(dep); err != nil {
-			utils.PrintError("Failed to install %s: %v\n", dep.Name, err)
-			utils.PrintInfo("Please try installing it manually from: %s\n", dep.DownloadURL[dm.OS])
+			utils.PrintError("❌ Failed to install %s: %v\n", dep.Name, err)
+			utils.PrintInfo("🔗 Please try installing it manually from: %s\n", dep.DownloadURL[dm.OS])
 			if dep.Required {
 				return fmt.Errorf("required dependency %s could not be installed", dep.Name)
 			}
@@ -181,7 +181,7 @@ func EnsureDependencies(yes bool) error {
 
 	missing, _ := dm.CheckDependencies()
 	if len(missing) == 0 {
-		utils.PrintSuccess("All dependencies are in place.\n")
+		utils.PrintSuccess("✅ All dependencies are in place.\n")
 		return nil
 	}
 
@@ -200,7 +200,7 @@ func EnsureDependencies(yes bool) error {
 		}
 	}
 
-	utils.PrintWarning("Continuing without optional dependencies.\n")
+	utils.PrintWarning("⚠️ Continuing without optional dependencies.\n")
 	return nil
 }
 

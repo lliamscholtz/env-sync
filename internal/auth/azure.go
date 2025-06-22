@@ -19,19 +19,19 @@ func CreateAzureCredential() (azcore.TokenCredential, error) {
 	// The new SDK versions require creating the actual credential type, not its options.
 	cliCred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
-		utils.PrintWarning("Could not create Azure CLI credential: %v\n", err)
+		utils.PrintWarning("⚠️ Could not create Azure CLI credential: %v\n", err)
 	}
 
 	managedIDCred, err := azidentity.NewManagedIdentityCredential(nil)
 	if err != nil {
-		utils.PrintWarning("Could not create Managed Identity credential: %v\n", err)
+		utils.PrintWarning("⚠️ Could not create Managed Identity credential: %v\n", err)
 	}
 
 	envCred, err := azidentity.NewEnvironmentCredential(nil)
 	if err != nil {
 		// Suppress warning for missing environment variables as this is expected
 		// when using Azure CLI authentication
-		utils.PrintDebug("Could not create Environment credential: %v\n", err)
+		utils.PrintDebug("🔧 Could not create Environment credential: %v\n", err)
 	}
 
 	// Filter out any credentials that failed to initialize
@@ -69,7 +69,7 @@ func IsAuthenticated(cred azcore.TokenCredential) bool {
 
 // EnsureAzureAuth is a high-level function that checks for Azure CLI and authentication status.
 func EnsureAzureAuth(skipDepCheck bool) error {
-	utils.PrintInfo("Verifying Azure authentication...\n")
+	utils.PrintInfo("🔐 Verifying Azure authentication...\n")
 	if !skipDepCheck {
 		// First, ensure Azure CLI dependency is met
 		dm, err := deps.NewDependencyManager()
@@ -102,12 +102,12 @@ func checkAuthStatus() error {
 	}
 
 	if !IsAuthenticated(cred) {
-		utils.PrintError("Not authenticated with Azure.\n")
+		utils.PrintError("❌ Not authenticated with Azure.\n")
 		PrintAuthHelp()
 		return fmt.Errorf("authentication failed")
 	}
 
-	utils.PrintSuccess("Azure authentication successful.\n")
+	utils.PrintSuccess("✅ Azure authentication successful.\n")
 	return nil
 }
 
@@ -123,8 +123,8 @@ func CheckAzLoginStatus() error {
 
 // PrintAuthHelp provides guidance on how to authenticate.
 func PrintAuthHelp() {
-	utils.PrintInfo("Please authenticate using one of the following methods:\n")
-	utils.PrintInfo("1. Run 'az login' to authenticate with the Azure CLI.\n")
-	utils.PrintInfo("2. Set environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID).\n")
-	utils.PrintInfo("3. If running in Azure, ensure Managed Identity is configured.\n")
+	utils.PrintInfo("🔑 Please authenticate using one of the following methods:\n")
+	utils.PrintInfo("  1️⃣ Run 'az login' to authenticate with the Azure CLI.\n")
+	utils.PrintInfo("  2️⃣ Set environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID).\n")
+	utils.PrintInfo("  3️⃣ If running in Azure, ensure Managed Identity is configured.\n")
 }
