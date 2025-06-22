@@ -1,0 +1,19 @@
+load('ext://env_sync', 'env_sync')
+
+# This is an example of how a consumer would use the env_sync extension.
+# It assumes the env-sync binary is in the PATH.
+# Replace with your actual vault details.
+env_sync(
+    vault_url='https://your-vault.vault.azure.net/',
+    secret_name='your-app-dev-env',
+    env_file='.env',
+    sync_interval='15m',
+    key_source='env'  # Assumes ENVSYNC_ENCRYPTION_KEY is set
+)
+
+# Your existing application's Tilt configuration would go here.
+# For example:
+#
+# docker_build('my-app-image', '.')
+# k8s_yaml('k8s/deployment.yaml')
+# k8s_resource('my-app-deployment', port_forwards=8080) 

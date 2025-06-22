@@ -1,0 +1,33 @@
+# tilt/env-sync.yaml
+# This file defines the Tilt extension for env-sync.
+
+def env_sync(vault_url, secret_name, env_file='.env', sync_interval='15m', key_source='env'):
+    """
+    Sets up env-sync to keep your local .env file in sync with Azure Key Vault.
+
+    Args:
+      vault_url: The URL of your Azure Key Vault.
+      secret_name: The name of the secret in the vault.
+      env_file: The local path to the .env file.
+      sync_interval: How often to perform a periodic sync.
+      key_source: The source of the encryption key ('env', 'file', 'prompt').
+    """
+    
+    # 1. Verify that the env-sync command exists and dependencies are met.
+    # This runs once at startup.
+    local_resource(
+        name='env-sync:deps-check',
+        cmd='env-sync doctor',
+        deps=['go.mod'], # Re-run if our own deps change
+        labels=['env-sync']
+    )
+
+    # 2. Start the watcher. It will run in the background.
+    # It depends on the success of the doctor check.
+    local_resource(
+        name='env-sync:watcher',
+        serve_cmd=f'env-sync watch --vault-url "{vault_url}" --secret-name "{secret_name}" --env-file "{env_file}" --interval "{sync_interval}" --key-source "{key_source}"',
+        deps=[env_file],
+        resource_deps=['env-sync:deps-check'],
+        labels=['env-sync']
+    ) 
