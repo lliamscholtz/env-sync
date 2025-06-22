@@ -1,8 +1,17 @@
 # env-sync
 
-Securely sync .env files with Azure Key Vault using encrypted storage and shared team keys.
+🔄 Securely sync .env files with Azure Key Vault using encrypted storage and shared team keys.
 
-## Quick Start
+## ✨ Features
+
+-   🔐 **Secure Encryption**: AES-256 encryption for all .env data
+-   🔑 **Team Key Sharing**: Share encryption keys securely across team members
+-   📁 **File Watching**: Automatic sync with configurable push/pull modes
+-   🏥 **Health Monitoring**: Built-in diagnostics and dependency management
+-   🔄 **Key Rotation**: Easy encryption key rotation for security maintenance
+-   🐳 **Tilt Integration**: Seamless integration with Tilt development workflows
+
+## 🚀 Quick Start
 
 ### Automatic Installation (Recommended)
 
@@ -46,7 +55,7 @@ If automatic installation fails, install dependencies manually:
 -   **Network**: Internet connection for dependency installation and Azure access
 -   **Permissions**: Administrator/sudo access for dependency installation
 
-## Team Setup
+## 👥 Team Setup
 
 ### Step 1: Generate Shared Encryption Key (Team Lead)
 
@@ -110,6 +119,10 @@ env-sync pull
 
 # Push changes to team
 env-sync push
+
+# Or use file watcher for automatic sync
+env-sync watch           # Pull-only mode (safe default)
+env-sync watch --push    # Full sync mode (pull + push on changes)
 ```
 
 ### Key Rotation (Security Maintenance)
@@ -128,14 +141,40 @@ env-sync rotate-key --old-key-source env --new-key "<new-base64-key>"
 env-sync pull
 ```
 
-## Commands
+## 📋 Commands
 
 ### Core Commands
 
 -   `env-sync init` - Initialize project configuration
 -   `env-sync push` - Upload encrypted .env to Azure Key Vault
 -   `env-sync pull` - Download and decrypt .env from Azure Key Vault
--   `env-sync watch` - Monitor .env file and auto-sync changes
+-   `env-sync watch` - Monitor and sync .env file changes (pull-only by default)
+-   `env-sync watch --push` - Full sync mode with push on file changes
+
+### File Watcher Modes
+
+The `watch` command supports two modes:
+
+**Pull-Only Mode (Default - Recommended for most teams)**
+
+```bash
+env-sync watch
+```
+
+-   ⬇️ Automatically pulls changes from Azure Key Vault every 15 minutes
+-   🛡️ Ignores local file changes (prevents accidental overwrites)
+-   🔒 Safe for team environments where multiple people might edit
+
+**Full Sync Mode (Advanced)**
+
+```bash
+env-sync watch --push
+```
+
+-   ⬇️ Pulls changes from Azure Key Vault every 15 minutes
+-   ⬆️ Pushes local changes to Azure Key Vault when .env file is modified
+-   ⚠️ Includes anti-cycle protection to prevent sync loops
+-   👥 Best for single-person workflows or when you're the primary editor
 
 ### Key Management
 
@@ -152,7 +191,7 @@ env-sync pull
 -   `env-sync auth` - Check Azure authentication status
 -   `env-sync status` - Show sync status and configuration
 
-## Tilt Integration
+## 🐳 Tilt Integration
 
 Add to your `Tiltfile`:
 
@@ -168,7 +207,7 @@ env_sync(
 )
 ```
 
-## Security Best Practices
+## 🔒 Security Best Practices
 
 -   **Never commit encryption keys to version control**
 -   Use secure channels for key distribution
@@ -176,8 +215,9 @@ env_sync(
 -   Use different keys for different environments
 -   Add `.env-sync-key` to `.gitignore` if using file storage
 -   Consider using password managers for team key storage
+-   Use pull-only mode (`env-sync watch`) in team environments to prevent conflicts
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
@@ -206,9 +246,23 @@ env_sync(
     - **Linux**: Ensure apt, yum, or dnf is available
 
 4. **"Cannot connect to Azure"**
+
     ```bash
     az login
     env-sync auth --check
+    ```
+
+5. **File Watcher Issues**
+
+    ```bash
+    # If watcher seems stuck or not responding
+    env-sync pull  # Manual pull to verify connectivity
+
+    # Check file permissions
+    ls -la .env
+
+    # Restart with verbose output
+    env-sync watch --push  # or just 'env-sync watch'
     ```
 
 ### System Diagnostics
@@ -226,7 +280,7 @@ env-sync doctor --check auth
 env-sync doctor --fix
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Configuration is stored in `.env-sync.yaml`:
 
@@ -239,7 +293,7 @@ key_source: env # env, file, or prompt
 key_file: .env-sync-key # only if key_source is "file"
 ```
 
-## Development
+## 🛠️ Development
 
 If you want to build from source or contribute to `env-sync`, you'll need Go 1.21+ installed.
 
@@ -263,7 +317,7 @@ make test
 make lint
 ```
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -272,6 +326,6 @@ make lint
 5. Run `make test` and `make lint`
 6. Submit a pull request
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.

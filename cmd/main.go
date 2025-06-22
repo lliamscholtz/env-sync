@@ -104,6 +104,9 @@ func init() {
 	// 'rotate-key' command flags
 	rotateKeyCmd.Flags().String("new-key", "", "The new base64 encoded key for re-encryption (required)")
 	rotateKeyCmd.MarkFlagRequired("new-key")
+
+	// 'watch' command flags
+	watchCmd.Flags().Bool("push", false, "Enable push on file changes (default: false, periodic pull only)")
 }
 
 func main() {
@@ -613,8 +616,9 @@ var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Monitor the .env file and automatically sync on changes",
 	Long: `Starts a long-running process that watches the local .env file for modifications.
-When a change is detected, it automatically runs the 'push' command to sync the new content to Azure Key Vault.
-The watcher also performs periodic syncs at a configurable interval.`,
+By default, only periodic pulls are performed to sync remote changes to your local .env file.
+Use --push flag to enable automatic pushes when local file changes are detected.
+The watcher performs periodic pulls at a configurable interval.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(cfgFile)
 		if err != nil {
@@ -623,6 +627,9 @@ The watcher also performs periodic syncs at a configurable interval.`,
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
+
+		// Get the push flag
+		enablePush, _ := cmd.Flags().GetBool("push")
 
 		// Ensure the .env file exists before starting the watcher
 		if _, err := os.Stat(cfg.EnvFile); os.IsNotExist(err) {
@@ -665,12 +672,17 @@ The watcher also performs periodic syncs at a configurable interval.`,
 			syncInterval = 15 * time.Minute
 		}
 
-		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc, pullFunc)
+		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc, pullFunc, enablePush)
 		if err != nil {
 			return fmt.Errorf("failed to create file watcher: %w", err)
 		}
 
 		utils.PrintInfo("🕐 Starting watcher with a %s pull interval and %s debounce time.\n", syncInterval, debounceTime)
+		if enablePush {
+			utils.PrintInfo("📋 File changes will push to Azure Key Vault, periodic syncs will pull from Azure Key Vault.\n")
+		} else {
+			utils.PrintInfo("📋 File change push disabled - only periodic pulls from Azure Key Vault are active.\n")
+		}
 		return w.Start(ctx)
 	},
 }

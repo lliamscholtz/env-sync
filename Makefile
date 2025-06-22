@@ -5,7 +5,7 @@ BIN_DIR=bin
 
 build:
 	@echo "Building the binary..."
-	@go build -o $(BINARY_NAME) ./cmd/main.go
+	@go build -o $(BIN_DIR)/$(BINARY_NAME) ./cmd/main.go
 
 install:
 	@echo "Installing the binary..."
@@ -21,7 +21,7 @@ deps:
 
 doctor: build
 	@echo "Running system health check..."
-	@./$(BINARY_NAME) doctor
+	@./$(BIN_DIR)/$(BINARY_NAME) doctor
 
 setup: deps build doctor
 	@echo "🎉 env-sync setup complete!"

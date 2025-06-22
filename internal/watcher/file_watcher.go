@@ -15,13 +15,14 @@ type FileWatcher struct {
 	DebounceTime    time.Duration
 	OnChangeFunc    func() error // Called when file changes (push)
 	OnPeriodicFunc  func() error // Called on periodic intervals (pull)
+	EnablePush      bool         // Whether to push on file changes
 	watcher         *fsnotify.Watcher
 	done            chan bool
 	lastPullTime    time.Time     // Timestamp of last pull operation
 }
 
 // NewFileWatcher creates a new file watcher instance.
-func NewFileWatcher(filePath string, syncInterval, debounceTime time.Duration, onChange func() error, onPeriodic func() error) (*FileWatcher, error) {
+func NewFileWatcher(filePath string, syncInterval, debounceTime time.Duration, onChange func() error, onPeriodic func() error, enablePush bool) (*FileWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -32,6 +33,7 @@ func NewFileWatcher(filePath string, syncInterval, debounceTime time.Duration, o
 		DebounceTime:   debounceTime,
 		OnChangeFunc:   onChange,
 		OnPeriodicFunc: onPeriodic,
+		EnablePush:     enablePush,
 		watcher:        watcher,
 		done:           make(chan bool),
 	}, nil
@@ -47,7 +49,11 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 		return err
 	}
 
-	utils.PrintInfo("🔍 File changes to %s will be automatically pushed to Azure Key Vault.\n", w.FilePath)
+	if w.EnablePush {
+		utils.PrintInfo("🔍 Watching %s (file changes will push, periodic pulls enabled).\n", w.FilePath)
+	} else {
+		utils.PrintInfo("🔍 Watching %s (file change push disabled, periodic pull only).\n", w.FilePath)
+	}
 
 	var lastChange time.Time
 	ticker := time.NewTicker(w.SyncInterval)
@@ -62,20 +68,26 @@ func (w *FileWatcher) Start(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
-			// We only care about writes and creates
-			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
-				// Skip file changes that happen within 10 seconds of a pull operation
-				// This prevents the pull from triggering a push
-				if time.Since(w.lastPullTime) < 10*time.Second {
-					continue
-				}
-				if time.Since(lastChange) > w.DebounceTime {
-					utils.PrintInfo("📝 Change detected in %s, pushing to remote...\n", w.FilePath)
-					if err := w.OnChangeFunc(); err != nil {
-						utils.PrintError("❌ Error during push: %v\n", err)
+			// Only process file changes if push is enabled
+			if w.EnablePush {
+				// We only care about writes and creates
+				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+					// Skip file changes that happen within 10 seconds of a pull operation
+					// This prevents the pull from triggering a push
+					if time.Since(w.lastPullTime) < 10*time.Second {
+						continue
 					}
-					lastChange = time.Now()
+					if time.Since(lastChange) > w.DebounceTime {
+						utils.PrintInfo("📝 Change detected in %s, pushing to remote...\n", w.FilePath)
+						if err := w.OnChangeFunc(); err != nil {
+							utils.PrintError("❌ Error during push: %v\n", err)
+						}
+						lastChange = time.Now()
+					}
 				}
+			} else {
+				// File change detection disabled - only periodic pulls are active
+				_ = event // Consume the event but don't act on it
 			}
 		case err, ok := <-w.watcher.Errors:
 			if !ok {
