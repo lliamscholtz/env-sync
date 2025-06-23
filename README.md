@@ -96,6 +96,8 @@ echo ".env-sync-key" >> .gitignore
 
 ### Step 4: Initialize Project
 
+**Single Environment Setup:**
+
 ```bash
 # Team lead initializes first
 env-sync init --vault-url https://myteam-vault.vault.azure.net/ --secret-name myapp-dev-env --key-source env
@@ -108,7 +110,28 @@ env-sync init --vault-url https://myteam-vault.vault.azure.net/ --secret-name my
 env-sync pull
 ```
 
+**Multi-Environment Setup (Recommended for teams):**
+
+```bash
+# Team lead creates configurations for each environment
+env-sync init --sync-file .env-sync.dev.yaml --vault-url https://myteam-vault.vault.azure.net/ --secret-name myapp-dev-env --key-source env
+env-sync init --sync-file .env-sync.qa.yaml --vault-url https://myteam-vault.vault.azure.net/ --secret-name myapp-qa-env --key-source env
+env-sync init --sync-file .env-sync.prod.yaml --vault-url https://myteam-vault.vault.azure.net/ --secret-name myapp-prod-env --key-source env
+
+# Push initial .env files for each environment
+env-sync push --sync-file .env-sync.dev.yaml
+env-sync push --sync-file .env-sync.qa.yaml
+env-sync push --sync-file .env-sync.prod.yaml
+
+# Other team members pull the configurations they need
+env-sync pull --sync-file .env-sync.dev.yaml    # Developers
+env-sync pull --sync-file .env-sync.qa.yaml     # QA team
+env-sync pull --sync-file .env-sync.prod.yaml   # DevOps/Production team
+```
+
 ### Daily Workflow
+
+**Single Environment:**
 
 ```bash
 # Pull latest changes
@@ -123,6 +146,23 @@ env-sync push
 # Or use file watcher for automatic sync
 env-sync watch           # Pull-only mode (safe default)
 env-sync watch --push    # Full sync mode (pull + push on changes)
+```
+
+**Multi-Environment:**
+
+```bash
+# Work with specific environments
+env-sync pull --sync-file .env-sync.dev.yaml     # Pull dev changes
+env-sync push --sync-file .env-sync.dev.yaml     # Push dev changes
+
+# Watch specific environment
+env-sync watch --sync-file .env-sync.dev.yaml    # Watch dev environment
+env-sync watch --sync-file .env-sync.qa.yaml --push  # Watch QA with push enabled
+
+# Check status of different environments
+env-sync status --sync-file .env-sync.dev.yaml
+env-sync status --sync-file .env-sync.qa.yaml
+env-sync status --sync-file .env-sync.prod.yaml
 ```
 
 ### Key Rotation (Security Maintenance)
@@ -150,6 +190,30 @@ env-sync pull
 -   `env-sync pull` - Download and decrypt .env from Azure Key Vault
 -   `env-sync watch` - Monitor and sync .env file changes (pull-only by default)
 -   `env-sync watch --push` - Full sync mode with push on file changes
+
+### Multi-Configuration Support
+
+Use `--sync-file` to work with multiple configuration files for different environments:
+
+```bash
+# Create separate configurations for different environments
+env-sync init --sync-file .env-sync.dev.yaml --vault-url <vault> --secret-name dev-secrets --key-source env
+env-sync init --sync-file .env-sync.qa.yaml --vault-url <vault> --secret-name qa-secrets --key-source env
+env-sync init --sync-file .env-sync.prod.yaml --vault-url <vault> --secret-name prod-secrets --key-source env
+
+# Use different configurations for operations
+env-sync push --sync-file .env-sync.dev.yaml     # Push to dev environment
+env-sync pull --sync-file .env-sync.qa.yaml      # Pull from QA environment
+env-sync watch --sync-file .env-sync.prod.yaml   # Watch prod environment
+env-sync status --sync-file .env-sync.dev.yaml   # Check dev status
+```
+
+**Benefits:**
+
+-   🎯 **Environment Isolation**: Separate configs for dev/qa/prod
+-   🔐 **Different Keys**: Use different encryption keys per environment
+-   🏗️ **Team Workflows**: Different team members can work on different environments
+-   📁 **Project Organization**: Keep environment-specific settings organized
 
 ### File Watcher Modes
 
@@ -282,6 +346,8 @@ env-sync doctor --fix
 
 ## ⚙️ Configuration
 
+### Single Configuration File
+
 Configuration is stored in `.env-sync.yaml`:
 
 ```yaml
@@ -291,6 +357,57 @@ env_file: .env
 sync_interval: 15m
 key_source: env # env, file, or prompt
 key_file: .env-sync-key # only if key_source is "file"
+```
+
+### Multiple Configuration Files
+
+For multi-environment setups, create separate configuration files:
+
+**`.env-sync.dev.yaml`:**
+
+```yaml
+vault_url: https://my-vault.vault.azure.net/
+secret_name: myapp-dev-env
+env_file: .env.dev
+sync_interval: 15m
+key_source: env
+```
+
+**`.env-sync.qa.yaml`:**
+
+```yaml
+vault_url: https://my-vault.vault.azure.net/
+secret_name: myapp-qa-env
+env_file: .env.qa
+sync_interval: 30m
+key_source: file
+key_file: .env-sync-qa-key
+```
+
+**`.env-sync.prod.yaml`:**
+
+```yaml
+vault_url: https://my-vault.vault.azure.net/
+secret_name: myapp-prod-env
+env_file: .env.prod
+sync_interval: 60m
+key_source: file
+key_file: .env-sync-prod-key
+```
+
+### Configuration Priority
+
+When using `--sync-file`, it takes precedence over `--config`:
+
+```bash
+# Uses .env-sync.dev.yaml (--sync-file takes priority)
+env-sync push --config .env-sync.yaml --sync-file .env-sync.dev.yaml
+
+# Uses .env-sync.yaml (fallback to --config)
+env-sync push --config .env-sync.yaml
+
+# Uses default .env-sync.yaml (no flags specified)
+env-sync push
 ```
 
 ## 🛠️ Development

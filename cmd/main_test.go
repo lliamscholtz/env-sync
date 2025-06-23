@@ -79,6 +79,61 @@ func TestHelpCommand(t *testing.T) {
 	output, err := execute("help")
 	assert.NoError(t, err)
 	assert.True(t, strings.HasPrefix(output, rootCmd.Long))
+	
+	// Check that multi-file support is documented in help
+	assert.Contains(t, output, "Multi-File Support:")
+	assert.Contains(t, output, "--sync-file")
+}
+
+func TestSyncFileFlag(t *testing.T) {
+	t.Run("help shows sync-file flag", func(t *testing.T) {
+		output, err := execute("--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file string")
+		assert.Contains(t, output, "sync configuration file")
+	})
+
+	t.Run("push command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("push", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync push --sync-file .env-sync.dev.yaml")
+	})
+
+	t.Run("pull command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("pull", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync pull --sync-file .env-sync.qa.yaml")
+	})
+
+	t.Run("watch command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("watch", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync watch --sync-file .env-sync.prod.yaml")
+	})
+
+	t.Run("status command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("status", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync status --sync-file .env-sync.dev.yaml")
+	})
+
+	t.Run("init command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("init", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync init --sync-file .env-sync.dev.yaml")
+	})
+
+	t.Run("rotate-key command shows sync-file usage", func(t *testing.T) {
+		output, err := execute("rotate-key", "--help")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "--sync-file")
+		assert.Contains(t, output, "env-sync rotate-key --new-key <key> --sync-file .env-sync.prod.yaml")
+	})
 }
 
 func TestVersionFlag(t *testing.T) {
@@ -86,6 +141,37 @@ func TestVersionFlag(t *testing.T) {
 	output, err := execute("--version")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "env-sync")
+}
+
+func TestGetConfigFile(t *testing.T) {
+	// Save original values
+	originalSyncFile := syncFile
+	originalCfgFile := cfgFile
+	defer func() {
+		syncFile = originalSyncFile
+		cfgFile = originalCfgFile
+	}()
+
+	t.Run("sync-file takes precedence", func(t *testing.T) {
+		syncFile = ".env-sync.test.yaml"
+		cfgFile = ".env-sync.other.yaml"
+		result := getConfigFile()
+		assert.Equal(t, ".env-sync.test.yaml", result)
+	})
+
+	t.Run("falls back to config file", func(t *testing.T) {
+		syncFile = ""
+		cfgFile = ".env-sync.fallback.yaml"
+		result := getConfigFile()
+		assert.Equal(t, ".env-sync.fallback.yaml", result)
+	})
+
+	t.Run("both empty returns empty", func(t *testing.T) {
+		syncFile = ""
+		cfgFile = ""
+		result := getConfigFile()
+		assert.Equal(t, "", result)
+	})
 }
 
 func TestDoctorCommandWithFlags(t *testing.T) {

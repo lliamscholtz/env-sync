@@ -27,8 +27,9 @@ var (
 	commit  = "none"
 	date    = "unknown"
 	
-	cfgFile string
-	cliKey  string
+	cfgFile  string
+	cliKey   string
+	syncFile string // Sync configuration file for multi-file support
 )
 
 var rootCmd = &cobra.Command{
@@ -39,7 +40,13 @@ var rootCmd = &cobra.Command{
 
 Prerequisites (automatically installed if missing):
   • Azure CLI (required for authentication)
-  • Tilt (optional, for development workflow integration)`,
+  • Tilt (optional, for development workflow integration)
+
+Multi-File Support:
+  Use --sync-file to specify different configuration files for different environments:
+    env-sync push --sync-file .env-sync.dev.yaml
+    env-sync pull --sync-file .env-sync.qa.yaml
+    env-sync watch --sync-file .env-sync.prod.yaml`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Commands that don't need pre-flight checks
 		if cmd.Name() == "install-deps" || cmd.Name() == "generate-key" || cmd.Name() == "help" || cmd.Name() == "init" || cmd.Name() == "version" {
@@ -67,6 +74,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.env-sync.yaml)")
 	rootCmd.PersistentFlags().StringVar(&cliKey, "key", "", "Base64 encoded encryption key (overrides all other key sources)")
+	rootCmd.PersistentFlags().StringVar(&syncFile, "sync-file", "", "sync configuration file (default is ./.env-sync.yaml)")
 
 	// Add commands
 	rootCmd.AddCommand(initCmd)
@@ -111,6 +119,14 @@ func init() {
 
 func main() {
 	Execute()
+}
+
+// getConfigFile returns the configuration file path, prioritizing --sync-file over --config
+func getConfigFile() string {
+	if syncFile != "" {
+		return syncFile
+	}
+	return cfgFile
 }
 
 // runSpecificCheck runs a check for a specific component
@@ -184,7 +200,7 @@ func checkAuth(autoFix bool) error {
 
 func checkConfig(autoFix bool) error {
 	utils.PrintInfo("🔍 Checking configuration...\n")
-	_, err := config.LoadConfig(cfgFile)
+	_, err := config.LoadConfig(getConfigFile())
 	if err != nil {
 		if autoFix {
 			utils.PrintInfo("⚙️ Configuration issues cannot be auto-fixed. Please run 'env-sync init'\n")
@@ -271,7 +287,10 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize project configuration (.env-sync.yaml)",
 	Long: `Initializes the project by creating a .env-sync.yaml configuration file.
-You must provide the Azure Key Vault URL, a name for the secret, and a source for the encryption key.`,
+You must provide the Azure Key Vault URL, a name for the secret, and a source for the encryption key.
+
+Use --sync-file to create a configuration file with a custom name:
+  env-sync init --sync-file .env-sync.dev.yaml --vault-url <url> --secret-name <name> --key-source <source>`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		vaultURL, _ := cmd.Flags().GetString("vault-url")
 		secretName, _ := cmd.Flags().GetString("secret-name")
@@ -335,11 +354,17 @@ You must provide the Azure Key Vault URL, a name for the secret, and a source fo
 			KeySource:    keySource,
 			KeyFile:      keyFile,
 		}
-		if err := finalConfig.WriteToFile(".env-sync.yaml"); err != nil {
+		
+		configFileName := getConfigFile()
+		if configFileName == "" {
+			configFileName = ".env-sync.yaml"
+		}
+		
+		if err := finalConfig.WriteToFile(configFileName); err != nil {
 			return err
 		}
 
-		utils.PrintSuccess("🎉 Configuration file '.env-sync.yaml' created successfully!\n")
+		utils.PrintSuccess("🎉 Configuration file '%s' created successfully!\n", configFileName)
 		utils.PrintInfo("📋 Next steps:\n")
 		utils.PrintInfo("  1️⃣ Ensure your .env file is present or create one.\n")
 		utils.PrintInfo("  2️⃣ Run 'env-sync push' to upload your .env file to Azure Key Vault.\n")
@@ -512,9 +537,12 @@ var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Encrypt and push the local .env file to Azure Key Vault",
 	Long: `Encrypts the local .env file using the configured encryption key and
-uploads it as a new secret version to the specified Azure Key Vault.`,
+uploads it as a new secret version to the specified Azure Key Vault.
+
+Use --sync-file to specify a different configuration file:
+  env-sync push --sync-file .env-sync.dev.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadConfig(cfgFile)
+		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
@@ -562,9 +590,12 @@ uploads it as a new secret version to the specified Azure Key Vault.`,
 var pullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Download and decrypt the .env file from Azure Key Vault",
-	Long:  `Retrieves the encrypted secret from Azure Key Vault, decrypts it using the configured key, and writes the content to the local .env file.`,
+	Long: `Retrieves the encrypted secret from Azure Key Vault, decrypts it using the configured key, and writes the content to the local .env file.
+
+Use --sync-file to specify a different configuration file:
+  env-sync pull --sync-file .env-sync.qa.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadConfig(cfgFile)
+		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
@@ -618,9 +649,12 @@ var watchCmd = &cobra.Command{
 	Long: `Starts a long-running process that watches the local .env file for modifications.
 By default, only periodic pulls are performed to sync remote changes to your local .env file.
 Use --push flag to enable automatic pushes when local file changes are detected.
-The watcher performs periodic pulls at a configurable interval.`,
+The watcher performs periodic pulls at a configurable interval.
+
+Use --sync-file to specify a different configuration file:
+  env-sync watch --sync-file .env-sync.prod.yaml --push`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadConfig(cfgFile)
+		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
 			return fmt.Errorf("failed to load configuration for watcher: %w", err)
 		}
@@ -702,10 +736,13 @@ var authCmd = &cobra.Command{
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show a summary of the current configuration and sync status",
-	Long:  `Displays the current configuration from the .env-sync.yaml file. It also compares the local .env file's modification time with the secret's last updated time in Azure Key Vault to determine sync status.`,
+	Long: `Displays the current configuration from the .env-sync.yaml file. It also compares the local .env file's modification time with the secret's last updated time in Azure Key Vault to determine sync status.
+
+Use --sync-file to specify a different configuration file:
+  env-sync status --sync-file .env-sync.dev.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		utils.PrintInfo("📊 --- env-sync Status ---\n")
-		cfg, err := config.LoadConfig(cfgFile)
+		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
@@ -714,7 +751,11 @@ var statusCmd = &cobra.Command{
 		}
 
 		// Print configuration
-		utils.PrintInfo("⚙️ Configuration loaded from '%s':\n", viper.ConfigFileUsed())
+		configFile := getConfigFile()
+		if configFile == "" {
+			configFile = ".env-sync.yaml"
+		}
+		utils.PrintInfo("⚙️ Configuration loaded from '%s':\n", configFile)
 		fmt.Printf("  - Vault URL: %s\n", cfg.VaultURL)
 		fmt.Printf("  - Secret Name: %s\n", cfg.SecretName)
 		fmt.Printf("  - Local Env File: %s\n", cfg.EnvFile)
@@ -770,9 +811,12 @@ var rotateKeyCmd = &cobra.Command{
 	Short: "Generate a new key and re-encrypt the secret in Azure Key Vault",
 	Long: `Rotates the encryption key. It fetches the secret, decrypts it with the old (currently configured) key,
 re-encrypts it with a new key provided via a flag, and updates the secret in Azure Key Vault.
-The new key must then be manually distributed to the team.`,
+The new key must then be manually distributed to the team.
+
+Use --sync-file to specify a different configuration file:
+  env-sync rotate-key --new-key <key> --sync-file .env-sync.prod.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadConfig(cfgFile)
+		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
