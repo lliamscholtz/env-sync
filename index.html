@@ -175,6 +175,29 @@
                 box-shadow: var(--shadow-secondary);
             }
 
+            .hero-logo {
+                animation: logoFloat 6s ease-in-out infinite;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .hero-logo svg {
+                filter: drop-shadow(0 0 20px rgba(88, 166, 255, 0.3));
+                max-width: 100%;
+                height: auto;
+            }
+
+            @keyframes logoFloat {
+                0%,
+                100% {
+                    transform: translateY(0px);
+                }
+                50% {
+                    transform: translateY(-10px);
+                }
+            }
+
             .hero-title {
                 font-size: 4.5rem;
                 font-weight: 900;
@@ -565,6 +588,69 @@
                 font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
             }
 
+            /* File Watcher Log Styles */
+            .file-watcher-log {
+                font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
+                font-size: 0.9rem;
+                line-height: 1.8;
+            }
+
+            .log-line {
+                margin-bottom: 0.5rem;
+                padding: 0.25rem 0;
+            }
+
+            .log-line.checking {
+                color: #fbbf24;
+            }
+
+            .log-line.found {
+                color: #10b981;
+            }
+
+            .log-line.success {
+                color: #10b981;
+                font-weight: 600;
+            }
+
+            .log-line.info {
+                color: var(--accent-primary);
+            }
+
+            .log-line.watching {
+                color: #8b5cf6;
+                font-weight: 600;
+            }
+
+            .log-line.pull {
+                color: #06b6d4;
+            }
+
+            .log-line.change {
+                color: #f59e0b;
+                font-weight: 600;
+            }
+
+            .log-line.prompt {
+                color: var(--accent-secondary);
+                font-weight: 600;
+            }
+
+            .log-line.push {
+                color: #3b82f6;
+            }
+
+            .log-line.encrypt {
+                color: #8b5cf6;
+            }
+
+            .log-separator {
+                height: 1px;
+                background: var(--border-secondary);
+                margin: 1rem 0;
+                opacity: 0.5;
+            }
+
             /* Setup Section */
             .setup-steps {
                 background: var(--bg-secondary);
@@ -921,6 +1007,11 @@
                 .container {
                     padding: 0 16px;
                 }
+
+                .hero-logo svg {
+                    width: 300px;
+                    height: 90px;
+                }
             }
 
             @media (max-width: 480px) {
@@ -951,7 +1042,88 @@
                         <span>🛡️</span>
                         <span>Enterprise-grade security</span>
                     </div>
-                    <h1 class="hero-title">env-sync</h1>
+
+                    <div class="hero-logo">
+                        <svg
+                            width="800"
+                            height="240"
+                            viewBox="0 0 145 60"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <style>
+                                .hex {
+                                    stroke: #58a6ff;
+                                    stroke-width: 2.5;
+                                    fill: none;
+                                }
+                                .braces {
+                                    fill: #f0f6fc;
+                                    font-size: 20px;
+                                    font-family: monospace;
+                                }
+                                .sync {
+                                    fill: #58a6ff;
+                                }
+                                .text {
+                                    fill: #f0f6fc;
+                                    font-family: sans-serif;
+                                    font-size: 20px;
+                                }
+                            </style>
+                            <!-- Hexagon -->
+                            <polygon
+                                class="hex"
+                                points="30,10 45,20 45,40 30,50 15,40 15,20"
+                            />
+
+                            <!-- Braces in center -->
+                            <text
+                                x="30"
+                                y="36"
+                                class="braces"
+                                text-anchor="middle"
+                            >
+                                {}
+                            </text>
+
+                            <!-- Sync Arrows - Circular refresh icon -->
+                            <g class="sync">
+                                <!-- Top right arrow -->
+                                <path
+                                    d="M47 22a8 8 0 0 1 0 16"
+                                    stroke="#58a6ff"
+                                    stroke-width="2"
+                                    fill="none"
+                                />
+                                <polygon
+                                    fill="#58a6ff"
+                                    points="50,20 54,22 50,26"
+                                />
+
+                                <!-- Bottom left arrow -->
+                                <path
+                                    d="M13 38a8 8 0 0 1 0-16"
+                                    stroke="#58a6ff"
+                                    stroke-width="2"
+                                    fill="none"
+                                />
+                                <polygon
+                                    fill="#58a6ff"
+                                    points="10,40 6,38 10,34"
+                                />
+                            </g>
+
+                            <!-- Text -->
+                            <text
+                                x="60"
+                                y="38"
+                                class="text"
+                            >
+                                env-sync
+                            </text>
+                        </svg>
+                    </div>
                     <p class="hero-subtitle">
                         Secure .env File Synchronization with Azure Key Vault
                     </p>
@@ -1036,15 +1208,6 @@
                             </p>
                         </div>
                         <div class="feature-card">
-                            <div class="feature-icon">🔑</div>
-                            <h3 class="feature-title">Team Key Sharing</h3>
-                            <p>
-                                Share encryption keys securely across team members
-                                using environment variables, files, or interactive
-                                prompts.
-                            </p>
-                        </div>
-                        <div class="feature-card">
                             <div class="feature-icon">📁</div>
                             <h3 class="feature-title">File Watching</h3>
                             <p>
@@ -1054,13 +1217,23 @@
                         </div>
                         <div class="feature-card">
                             <div class="feature-icon">⚡</div>
-                            <h3 class="feature-title">Smart Conflict Resolution</h3>
+                            <h3 class="feature-title">Conflict Resolution</h3>
                             <p>
                                 Smart conflict detection shows exactly which keys
                                 differ, with multiple resolution strategies and
                                 automatic diff display.
                             </p>
                         </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🔑</div>
+                            <h3 class="feature-title">Team Key Sharing</h3>
+                            <p>
+                                Share encryption keys securely across team members
+                                using environment variables, files, or interactive
+                                prompts.
+                            </p>
+                        </div>
+
                         <div class="feature-card">
                             <div class="feature-icon">🔄</div>
                             <h3 class="feature-title">Key Rotation</h3>
@@ -1076,6 +1249,125 @@
                                 Separate configurations for dev, staging, and
                                 production with isolated encryption keys.
                             </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- File Watching Demo Section -->
+                <section
+                    id="file-watching"
+                    class="section"
+                >
+                    <h2 class="section-title">Real-time File Watching</h2>
+                    <p class="section-subtitle">
+                        See how env-sync automatically detects and syncs changes
+                    </p>
+
+                    <div class="conflict-demo">
+                        <div class="demo-scenario">
+                            <h3>Automatic Detection & Synchronization</h3>
+                            <p>
+                                env-sync continuously monitors your .env file and
+                                provides intelligent sync options:
+                            </p>
+
+                            <div class="conflict-output">
+                                <div class="file-watcher-log">
+                                    <div class="log-line checking">
+                                        🔍 Checking dependencies...
+                                    </div>
+                                    <div class="log-line found">
+                                        🔍 Found dependency: Azure CLI
+                                    </div>
+                                    <div class="log-line found">
+                                        🔍 Found dependency: Tilt
+                                    </div>
+                                    <div class="log-line success">
+                                        ✅ All dependencies are in place.
+                                    </div>
+
+                                    <div class="log-separator"></div>
+
+                                    <div class="log-line checking">
+                                        🔐 Verifying Azure authentication...
+                                    </div>
+                                    <div class="log-line success">
+                                        ✅ Azure authentication successful.
+                                    </div>
+
+                                    <div class="log-separator"></div>
+
+                                    <div class="log-line info">
+                                        🕐 Starting watcher with a 15m pull interval
+                                        and 5s debounce time.
+                                    </div>
+                                    <div class="log-line info">
+                                        📋 File changes will push to Azure Key Vault,
+                                        periodic syncs will pull from Azure Key
+                                        Vault.
+                                    </div>
+                                    <div class="log-line watching">
+                                        🔍 Watching .env (file changes will prompt
+                                        for push, periodic pulls enabled).
+                                    </div>
+
+                                    <div class="log-separator"></div>
+
+                                    <div class="log-line pull">
+                                        ⬇️ Pulling secret from Azure Key Vault.
+                                    </div>
+                                    <div class="log-line success">
+                                        ✅ Successfully pulled and decrypted .env
+                                        from Azure Key Vault.
+                                    </div>
+
+                                    <div class="log-separator"></div>
+
+                                    <div class="log-line change">
+                                        📝 Change detected in .env (event: WRITE)
+                                    </div>
+
+                                    <div class="log-line prompt">
+                                        🚀 Push changes to remote? [y/N]: y
+                                    </div>
+                                    <div class="log-line push">
+                                        📤 Pushing changes to remote...
+                                    </div>
+                                    <div class="log-line success">
+                                        ✅ No conflicts detected with remote version.
+                                    </div>
+                                    <div class="log-line encrypt">
+                                        🔒 Pushing encrypted content to Azure Key
+                                        Vault...
+                                    </div>
+                                    <div class="log-line success">
+                                        ✅ Successfully pushed encrypted .env file to
+                                        Azure Key Vault.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="resolution-strategies">
+                                <h4>Watcher Configuration Options</h4>
+                                <div class="strategy-grid">
+                                    <div class="strategy-item">
+                                        <strong>--pull-interval</strong> - Set
+                                        automatic pull frequency (default: 30s)
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>--debounce</strong> - Delay before
+                                        processing file changes (default: 2s)
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>--push-only</strong> - Only push
+                                        changes, disable periodic pulls
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>--pull-only</strong> - Only pull
+                                        changes, disable push on file change
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
