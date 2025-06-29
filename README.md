@@ -273,13 +273,36 @@ env_sync(
 
 ## 🔒 Security Best Practices
 
--   **Never commit encryption keys to version control**
--   Use secure channels for key distribution
--   Rotate keys periodically (quarterly recommended)
--   Use different keys for different environments
--   Add `.env-sync-key` to `.gitignore` if using file storage
--   Consider using password managers for team key storage
--   Use pull-only mode (`env-sync watch`) in team environments to prevent conflicts
+### ⚠️ Critical Security Warnings
+
+-   **NEVER use `--key` parameter in production** - Keys are visible in process lists
+-   **Never commit encryption keys to version control** 
+-   **Never store keys in world-readable files** - Use `chmod 600` for key files
+
+### 🛡️ Secure Key Management
+
+-   **Environment Variables**: Use `ENVSYNC_ENCRYPTION_KEY` for CI/CD systems
+-   **Key Files**: Store with `chmod 600` permissions and add to `.gitignore`
+-   **Interactive Prompt**: Most secure option - keys never stored on disk
+-   **Different Keys**: Use separate encryption keys per environment (dev/staging/prod)
+-   **Key Rotation**: Rotate keys quarterly using `env-sync rotate-key`
+
+### 🏢 Production Security
+
+-   **Azure RBAC**: Use principle of least privilege for Key Vault access
+-   **Network Security**: Configure private endpoints and firewall rules for Key Vault
+-   **Audit Logging**: Enable Key Vault access logging and monitoring
+-   **File Permissions**: Secure config files with `chmod 600 .env-sync*.yaml`
+
+### 📋 Quick Security Checklist
+
+- [ ] Keys stored securely (not in CLI args or world-readable files)
+- [ ] Different keys for each environment
+- [ ] Key Vault access restricted and monitored
+- [ ] Configuration files have proper permissions
+- [ ] Regular key rotation schedule established
+
+**📖 For comprehensive security guidance, see [SECURITY.md](SECURITY.md)**
 
 ## 🔧 Troubleshooting
 
