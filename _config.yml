@@ -1,0 +1,33 @@
+# GitHub Pages configuration for env-sync
+title: "env-sync"
+description: "Secure .env file synchronization with Azure Key Vault"
+url: "https://lliamscholtz.github.io"
+baseurl: "/env-sync"
+
+# Enable GitHub Pages
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+
+# Exclude files from processing
+exclude:
+  - README.md
+  - SECURITY.md
+  - CLAUDE.md
+  - PRODUCTION-SECURITY-CHECKLIST.md
+  - Makefile
+  - go.mod
+  - go.sum
+  - cmd/
+  - internal/
+  - scripts/
+  - demo/
+  - tilt/
+  - bin/
+  - .gitignore
+  - .github/
+  - env-sync
+
+# Include the landing page
+include:
+  - index.html

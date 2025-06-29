@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>
+            env-sync - Secure .env File Synchronization with Azure Key Vault
+        </title>
+        <meta
+            name="description"
+            content="Securely sync .env files with Azure Key Vault using AES-256 encryption. Share environment variables safely across teams with built-in file watching and multi-environment support."
+        />
+        <link
+            rel="preconnect"
+            href="https://fonts.googleapis.com"
+        />
+        <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossorigin
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg-primary: #0d1117;
+                --bg-secondary: #161b22;
+                --bg-tertiary: #21262d;
+                --border-primary: #30363d;
+                --border-secondary: #21262d;
+                --text-primary: #f0f6fc;
+                --text-secondary: #8b949e;
+                --text-muted: #7d8590;
+                --accent-primary: #58a6ff;
+                --accent-secondary: #1f6feb;
+                --gradient-primary: linear-gradient(
+                    135deg,
+                    #1f6feb 0%,
+                    #58a6ff 50%,
+                    #79c0ff 100%
+                );
+                --gradient-secondary: linear-gradient(
+                    135deg,
+                    #7c3aed 0%,
+                    #a855f7 50%,
+                    #c084fc 100%
+                );
+                --gradient-tertiary: linear-gradient(
+                    135deg,
+                    #0ea5e9 0%,
+                    #06b6d4 50%,
+                    #67e8f9 100%
+                );
+                --success-color: #238636;
+                --warning-color: #f85149;
+                --shadow-primary: 0 16px 32px rgba(1, 4, 9, 0.85);
+                --shadow-secondary: 0 8px 16px rgba(1, 4, 9, 0.7);
+                --glow-primary: 0 0 20px rgba(88, 166, 255, 0.3);
+                --glow-secondary: 0 0 20px rgba(168, 85, 247, 0.3);
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                    Roboto, sans-serif;
+                line-height: 1.6;
+                color: var(--text-primary);
+                background: var(--bg-primary);
+                overflow-x: hidden;
+            }
+
+            /* Animated background */
+            body::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(
+                        circle at 20% 50%,
+                        rgba(88, 166, 255, 0.15) 0%,
+                        transparent 50%
+                    ),
+                    radial-gradient(
+                        circle at 80% 20%,
+                        rgba(168, 85, 247, 0.15) 0%,
+                        transparent 50%
+                    ),
+                    radial-gradient(
+                        circle at 40% 80%,
+                        rgba(6, 182, 212, 0.15) 0%,
+                        transparent 50%
+                    );
+                z-index: -1;
+                animation: backgroundShift 20s ease infinite;
+            }
+
+            @keyframes backgroundShift {
+                0%,
+                100% {
+                    transform: translateX(0) translateY(0);
+                }
+                25% {
+                    transform: translateX(-20px) translateY(-10px);
+                }
+                50% {
+                    transform: translateX(20px) translateY(10px);
+                }
+                75% {
+                    transform: translateX(-10px) translateY(20px);
+                }
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 24px;
+            }
+
+            /* Header */
+            header {
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                padding: 8rem 0 6rem;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: radial-gradient(
+                        circle at 50% 50%,
+                        rgba(88, 166, 255, 0.1) 0%,
+                        transparent 70%
+                    ),
+                    linear-gradient(180deg, transparent 0%, var(--bg-primary) 100%);
+                z-index: 1;
+            }
+
+            .hero-content {
+                position: relative;
+                z-index: 2;
+            }
+
+            .hero-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                border-radius: 24px;
+                padding: 8px 16px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: var(--text-secondary);
+                margin-bottom: 2rem;
+                backdrop-filter: blur(12px);
+                box-shadow: var(--shadow-secondary);
+            }
+
+            .hero-title {
+                font-size: 4.5rem;
+                font-weight: 900;
+                margin-bottom: 1.5rem;
+                line-height: 1.1;
+                background: var(--gradient-primary);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                animation: titleGlow 3s ease-in-out infinite alternate;
+            }
+
+            @keyframes titleGlow {
+                from {
+                    filter: drop-shadow(0 0 20px rgba(88, 166, 255, 0.3));
+                }
+                to {
+                    filter: drop-shadow(0 0 30px rgba(88, 166, 255, 0.5));
+                }
+            }
+
+            .hero-subtitle {
+                font-size: 1.5rem;
+                font-weight: 400;
+                margin-bottom: 1.5rem;
+                color: var(--text-secondary);
+            }
+
+            .hero-description {
+                font-size: 1.25rem;
+                margin-bottom: 3rem;
+                max-width: 700px;
+                margin-left: auto;
+                margin-right: auto;
+                color: var(--text-secondary);
+                line-height: 1.7;
+            }
+
+            .cta-buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px 32px;
+                border-radius: 12px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 1rem;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                border: 1px solid transparent;
+                position: relative;
+                overflow: hidden;
+                backdrop-filter: blur(12px);
+            }
+
+            .btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                z-index: -1;
+            }
+
+            .btn-primary {
+                background: var(--gradient-primary);
+                color: white;
+                box-shadow: var(--shadow-secondary), var(--glow-primary);
+            }
+
+            .btn-primary::before {
+                background: linear-gradient(
+                    135deg,
+                    #2563eb 0%,
+                    #3b82f6 50%,
+                    #60a5fa 100%
+                );
+            }
+
+            .btn-primary:hover::before {
+                opacity: 1;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-primary), var(--glow-primary);
+            }
+
+            .btn-outline {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border-color: var(--border-primary);
+                box-shadow: var(--shadow-secondary);
+            }
+
+            .btn-outline::before {
+                background: var(--bg-tertiary);
+            }
+
+            .btn-outline:hover::before {
+                opacity: 1;
+            }
+
+            .btn-outline:hover {
+                transform: translateY(-2px);
+                border-color: var(--accent-primary);
+                box-shadow: var(--shadow-primary), 0 0 20px rgba(88, 166, 255, 0.2);
+            }
+
+            /* Main Content */
+            main {
+                padding: 6rem 0;
+                position: relative;
+            }
+
+            .section {
+                margin-bottom: 8rem;
+                position: relative;
+            }
+
+            .section-title {
+                font-size: 3rem;
+                font-weight: 800;
+                text-align: center;
+                margin-bottom: 1.5rem;
+                color: var(--text-primary);
+                position: relative;
+            }
+
+            .section-title::after {
+                content: '';
+                position: absolute;
+                bottom: -12px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 80px;
+                height: 3px;
+                background: var(--gradient-primary);
+                border-radius: 2px;
+            }
+
+            .section-subtitle {
+                font-size: 1.375rem;
+                text-align: center;
+                margin-bottom: 4rem;
+                color: var(--text-secondary);
+                max-width: 800px;
+                margin-left: auto;
+                margin-right: auto;
+                line-height: 1.6;
+            }
+
+            /* Problem Section */
+            .problem-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+                margin-bottom: 4rem;
+            }
+
+            .problem-card {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                padding: 2.5rem;
+                border-radius: 16px;
+                text-align: center;
+                position: relative;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                backdrop-filter: blur(12px);
+                overflow: hidden;
+            }
+
+            .problem-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: var(--gradient-secondary);
+            }
+
+            .problem-card:hover {
+                transform: translateY(-8px);
+                border-color: var(--accent-primary);
+                box-shadow: var(--shadow-primary), 0 0 30px rgba(168, 85, 247, 0.2);
+            }
+
+            .problem-icon {
+                font-size: 3.5rem;
+                margin-bottom: 1.5rem;
+                display: block;
+                filter: grayscale(0.3);
+            }
+
+            .problem-title {
+                font-size: 1.375rem;
+                font-weight: 700;
+                margin-bottom: 1rem;
+                color: var(--text-primary);
+            }
+
+            .problem-card p {
+                color: var(--text-secondary);
+                line-height: 1.6;
+            }
+
+            /* Solution Section */
+            .features-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+            }
+
+            .feature-card {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                padding: 2.5rem;
+                border-radius: 16px;
+                text-align: center;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                position: relative;
+                backdrop-filter: blur(12px);
+                overflow: hidden;
+            }
+
+            .feature-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: var(--gradient-tertiary);
+            }
+
+            .feature-card:hover {
+                transform: translateY(-8px);
+                border-color: var(--accent-primary);
+                box-shadow: var(--shadow-primary), 0 0 30px rgba(6, 182, 212, 0.2);
+            }
+
+            .feature-icon {
+                font-size: 3.5rem;
+                margin-bottom: 1.5rem;
+                display: block;
+            }
+
+            .feature-title {
+                font-size: 1.375rem;
+                font-weight: 700;
+                margin-bottom: 1rem;
+                color: var(--text-primary);
+            }
+
+            .feature-card p {
+                color: var(--text-secondary);
+                line-height: 1.6;
+            }
+
+            /* Setup Section */
+            .setup-steps {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                padding: 3rem;
+                border-radius: 16px;
+                margin-bottom: 3rem;
+                backdrop-filter: blur(12px);
+                box-shadow: var(--shadow-secondary);
+            }
+
+            .step {
+                display: flex;
+                align-items: flex-start;
+                margin-bottom: 3rem;
+                padding-bottom: 3rem;
+                border-bottom: 1px solid var(--border-secondary);
+                position: relative;
+            }
+
+            .step:last-child {
+                margin-bottom: 0;
+                padding-bottom: 0;
+                border-bottom: none;
+            }
+
+            .step-number {
+                background: var(--gradient-primary);
+                color: white;
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+                margin-right: 1.5rem;
+                flex-shrink: 0;
+                box-shadow: var(--shadow-secondary), var(--glow-primary);
+                position: relative;
+                z-index: 1;
+            }
+
+            .step-number::before {
+                content: '';
+                position: absolute;
+                top: -2px;
+                left: -2px;
+                right: -2px;
+                bottom: -2px;
+                background: var(--gradient-primary);
+                border-radius: 50%;
+                z-index: -1;
+                opacity: 0.3;
+                animation: pulse 2s ease-in-out infinite;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    transform: scale(1);
+                    opacity: 0.3;
+                }
+                50% {
+                    transform: scale(1.1);
+                    opacity: 0.6;
+                }
+            }
+
+            .step-content h3 {
+                font-size: 1.5rem;
+                font-weight: 700;
+                margin-bottom: 0.75rem;
+                color: var(--text-primary);
+            }
+
+            .step-content p {
+                color: var(--text-secondary);
+                margin-bottom: 1rem;
+                line-height: 1.6;
+            }
+
+            .code-block {
+                background: var(--bg-primary);
+                border: 1px solid var(--border-primary);
+                color: var(--text-primary);
+                padding: 1.5rem;
+                border-radius: 12px;
+                font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono',
+                    monospace;
+                font-size: 0.9rem;
+                overflow-x: auto;
+                margin: 1.5rem 0;
+                position: relative;
+                box-shadow: var(--shadow-secondary);
+            }
+
+            .code-block::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 1px;
+                background: var(--gradient-primary);
+            }
+
+            /* Security Warning */
+            .security-warning {
+                background: var(--bg-secondary);
+                border: 1px solid rgba(248, 81, 73, 0.3);
+                padding: 2rem;
+                border-radius: 12px;
+                margin: 3rem 0;
+                position: relative;
+                backdrop-filter: blur(12px);
+                box-shadow: var(--shadow-secondary);
+            }
+
+            .security-warning::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: linear-gradient(135deg, #f85149 0%, #ff6b6b 100%);
+                border-radius: 12px 12px 0 0;
+            }
+
+            .security-warning h4 {
+                color: #f85149;
+                margin-bottom: 1rem;
+                font-weight: 700;
+                font-size: 1.25rem;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .security-warning p {
+                color: var(--text-secondary);
+                line-height: 1.6;
+            }
+
+            .security-warning a {
+                color: var(--accent-primary);
+                text-decoration: none;
+                font-weight: 600;
+            }
+
+            .security-warning a:hover {
+                text-decoration: underline;
+            }
+
+            /* Contribute Section */
+            .contribute-section {
+                background: var(--bg-secondary);
+                border-top: 1px solid var(--border-primary);
+                color: var(--text-primary);
+                padding: 6rem 0;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .contribute-section::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: radial-gradient(
+                        circle at 30% 20%,
+                        rgba(88, 166, 255, 0.1) 0%,
+                        transparent 50%
+                    ),
+                    radial-gradient(
+                        circle at 70% 80%,
+                        rgba(168, 85, 247, 0.1) 0%,
+                        transparent 50%
+                    );
+                z-index: 1;
+            }
+
+            .contribute-section .container {
+                position: relative;
+                z-index: 2;
+            }
+
+            .contribute-section .section-title {
+                color: var(--text-primary);
+            }
+
+            .contribute-section .section-title::after {
+                background: var(--gradient-secondary);
+            }
+
+            .github-stats {
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin: 3rem 0;
+                flex-wrap: wrap;
+            }
+
+            .stat-card {
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border-primary);
+                padding: 2rem 2.5rem;
+                border-radius: 16px;
+                backdrop-filter: blur(12px);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .stat-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: var(--gradient-secondary);
+            }
+
+            .stat-card:hover {
+                transform: translateY(-4px);
+                border-color: var(--accent-primary);
+                box-shadow: var(--shadow-secondary), var(--glow-secondary);
+            }
+
+            .stat-number {
+                font-size: 2.5rem;
+                font-weight: 800;
+                display: block;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+
+            .stat-label {
+                font-size: 1rem;
+                color: var(--text-secondary);
+                font-weight: 500;
+            }
+
+            /* Footer */
+            footer {
+                background: var(--bg-primary);
+                border-top: 1px solid var(--border-primary);
+                color: var(--text-secondary);
+                padding: 3rem 0;
+                text-align: center;
+            }
+
+            .footer-links {
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-bottom: 2rem;
+                flex-wrap: wrap;
+            }
+
+            .footer-links a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-weight: 500;
+                transition: all 0.3s ease;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+            }
+
+            .footer-links a:hover {
+                color: var(--accent-primary);
+                background: var(--bg-secondary);
+            }
+
+            footer p {
+                color: var(--text-muted);
+                font-size: 0.875rem;
+            }
+
+            /* Responsive Design */
+            @media (max-width: 768px) {
+                header {
+                    padding: 6rem 0 4rem;
+                }
+
+                .hero-title {
+                    font-size: 3rem;
+                }
+
+                .hero-subtitle {
+                    font-size: 1.25rem;
+                }
+
+                .hero-description {
+                    font-size: 1.125rem;
+                }
+
+                .section-title {
+                    font-size: 2.5rem;
+                }
+
+                .section-subtitle {
+                    font-size: 1.25rem;
+                }
+
+                .cta-buttons {
+                    flex-direction: column;
+                    align-items: center;
+                }
+
+                .btn {
+                    width: 100%;
+                    max-width: 320px;
+                }
+
+                .problem-grid,
+                .features-grid {
+                    grid-template-columns: 1fr;
+                    gap: 1.5rem;
+                }
+
+                .setup-steps {
+                    padding: 2rem;
+                }
+
+                .step {
+                    flex-direction: column;
+                    text-align: center;
+                    margin-bottom: 2rem;
+                    padding-bottom: 2rem;
+                }
+
+                .step-number {
+                    margin-right: 0;
+                    margin-bottom: 1rem;
+                }
+
+                .github-stats {
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .stat-card {
+                    width: 100%;
+                    max-width: 200px;
+                }
+
+                .container {
+                    padding: 0 16px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                .hero-title {
+                    font-size: 2.5rem;
+                }
+
+                .section-title {
+                    font-size: 2rem;
+                }
+
+                .problem-card,
+                .feature-card {
+                    padding: 2rem;
+                }
+
+                .setup-steps {
+                    padding: 1.5rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span>🛡️</span>
+                        <span>Enterprise-grade security</span>
+                    </div>
+                    <h1 class="hero-title">env-sync</h1>
+                    <p class="hero-subtitle">
+                        Secure .env File Synchronization with Azure Key Vault
+                    </p>
+                    <p class="hero-description">
+                        Eliminate insecure .env file sharing forever. Securely sync
+                        environment variables across teams using AES-256 encryption,
+                        Azure Key Vault, and intelligent file watching. Built for
+                        modern development workflows.
+                    </p>
+                    <div class="cta-buttons">
+                        <a
+                            href="#setup"
+                            class="btn btn-primary"
+                        >
+                            <span>🚀</span>
+                            <span>Get Started</span>
+                        </a>
+                        <a
+                            href="https://github.com/lliamscholtz/env-sync"
+                            class="btn btn-outline"
+                            target="_blank"
+                        >
+                            <span>⭐</span>
+                            <span>Star on GitHub</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="container">
+                <!-- Problem Section -->
+                <section class="section">
+                    <h2 class="section-title">The Problem</h2>
+                    <p class="section-subtitle">
+                        Managing environment variables across teams and environments
+                        is broken. Here's why:
+                    </p>
+                    <div class="problem-grid">
+                        <div class="problem-card">
+                            <div class="problem-icon">🔓</div>
+                            <h3 class="problem-title">Insecure Sharing</h3>
+                            <p>
+                                Teams share .env files through Slack, email, or
+                                commit them to Git, exposing sensitive credentials.
+                            </p>
+                        </div>
+                        <div class="problem-card">
+                            <div class="problem-icon">🔄</div>
+                            <h3 class="problem-title">Manual Sync</h3>
+                            <p>
+                                Developers manually copy-paste environment variables,
+                                leading to outdated configs and broken deployments.
+                            </p>
+                        </div>
+                        <div class="problem-card">
+                            <div class="problem-icon">🏢</div>
+                            <h3 class="problem-title">No Team Management</h3>
+                            <p>
+                                No centralized way to manage who has access to which
+                                environment variables across different projects.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Solution Section -->
+                <section class="section">
+                    <h2 class="section-title">The Solution</h2>
+                    <p class="section-subtitle">
+                        env-sync provides enterprise-grade security with
+                        developer-friendly automation
+                    </p>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">🔐</div>
+                            <h3 class="feature-title">AES-256 Encryption</h3>
+                            <p>
+                                All environment data is encrypted with military-grade
+                                AES-256-GCM before being stored in Azure Key Vault.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🔑</div>
+                            <h3 class="feature-title">Team Key Sharing</h3>
+                            <p>
+                                Share encryption keys securely across team members
+                                using environment variables, files, or interactive
+                                prompts.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">📁</div>
+                            <h3 class="feature-title">File Watching</h3>
+                            <p>
+                                Automatic synchronization with configurable push/pull
+                                modes. Changes are detected and synced in real-time.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🏥</div>
+                            <h3 class="feature-title">Health Monitoring</h3>
+                            <p>
+                                Built-in diagnostics and dependency management ensure
+                                your sync setup is always working correctly.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🔄</div>
+                            <h3 class="feature-title">Key Rotation</h3>
+                            <p>
+                                Easy encryption key rotation for security maintenance
+                                without disrupting team workflows.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">🌍</div>
+                            <h3 class="feature-title">Multi-Environment</h3>
+                            <p>
+                                Separate configurations for dev, staging, and
+                                production with isolated encryption keys.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Setup Section -->
+                <section
+                    id="setup"
+                    class="section"
+                >
+                    <h2 class="section-title">Quick Setup</h2>
+                    <p class="section-subtitle">Get started in under 5 minutes</p>
+
+                    <div class="setup-steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3>Install env-sync</h3>
+                                <p>
+                                    Install using our automated script or Go
+                                    directly:
+                                </p>
+                                <div class="code-block">
+                                    curl -fsSL
+                                    https://raw.githubusercontent.com/lliamscholtz/env-sync/main/scripts/install.sh
+                                    | bash
+                                </div>
+                                <p>Or with Go:</p>
+                                <div class="code-block">
+                                    go install
+                                    github.com/lliamscholtz/env-sync@latest
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3>Install Dependencies</h3>
+                                <p>
+                                    Automatically install Azure CLI and verify your
+                                    setup:
+                                </p>
+                                <div class="code-block">
+                                    env-sync install-deps env-sync doctor
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3>Generate Encryption Key</h3>
+                                <p>Create a secure encryption key for your team:</p>
+                                <div class="code-block">env-sync generate-key</div>
+                                <p>
+                                    Share this key securely with your team through
+                                    your password manager.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h3>Initialize Project</h3>
+                                <p>Set up your project configuration:</p>
+                                <div class="code-block">
+                                    export ENVSYNC_ENCRYPTION_KEY="your-base64-key"
+                                    env-sync init --vault-url
+                                    https://your-vault.vault.azure.net/ --secret-name
+                                    myapp-env --key-source env
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <h3>Start Syncing</h3>
+                                <p>
+                                    Push your initial .env file and start file
+                                    watching:
+                                </p>
+                                <div class="code-block">
+                                    env-sync push env-sync watch
+                                </div>
+                                <p>
+                                    Your .env file is now securely synced with Azure
+                                    Key Vault!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="security-warning">
+                        <h4>🛡️ Security Best Practices</h4>
+                        <p>
+                            <strong
+                                >Never use the <code>--key</code> CLI parameter in
+                                production</strong
+                            >
+                            - keys are visible in process lists. Always use
+                            environment variables, secure key files with
+                            <code>chmod 600</code>, or interactive prompts.
+                            <br /><br />
+                            <a
+                                href="https://github.com/lliamscholtz/env-sync/blob/main/SECURITY.md"
+                                target="_blank"
+                                >📖 Read the complete security guide</a
+                            >
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Contribute Section -->
+        <section class="contribute-section">
+            <div class="container">
+                <h2 class="section-title">Open Source & Community</h2>
+                <p class="section-subtitle">
+                    env-sync is open source and welcomes contributions from
+                    developers worldwide
+                </p>
+
+                <div class="github-stats">
+                    <div class="stat-card">
+                        <span class="stat-number">MIT</span>
+                        <span class="stat-label">License</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">Go</span>
+                        <span class="stat-label">Language</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">Azure</span>
+                        <span class="stat-label">Key Vault</span>
+                    </div>
+                </div>
+
+                <div class="cta-buttons">
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync"
+                        class="btn btn-primary"
+                        target="_blank"
+                        >⭐ Star on GitHub</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/issues"
+                        class="btn btn-outline"
+                        target="_blank"
+                        >🐛 Report Issues</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/blob/main/README.md#contributing"
+                        class="btn btn-outline"
+                        target="_blank"
+                        >🤝 Contribute</a
+                    >
+                </div>
+
+                <p style="margin-top: 2rem; opacity: 0.9">
+                    Whether you're fixing bugs, adding features, improving
+                    documentation, or helping with testing - every contribution makes
+                    env-sync better for the entire community.
+                </p>
+            </div>
+        </section>
+
+        <footer>
+            <div class="container">
+                <div class="footer-links">
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync"
+                        target="_blank"
+                        >GitHub</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/blob/main/README.md"
+                        target="_blank"
+                        >Documentation</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/blob/main/SECURITY.md"
+                        target="_blank"
+                        >Security</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/issues"
+                        target="_blank"
+                        >Issues</a
+                    >
+                    <a
+                        href="https://github.com/lliamscholtz/env-sync/releases"
+                        target="_blank"
+                        >Releases</a
+                    >
+                </div>
+                <p>&copy; 2024 env-sync. Open source under MIT license.</p>
+            </div>
+        </footer>
+    </body>
+</html>
