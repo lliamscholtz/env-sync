@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-env-sync is a Go CLI tool that securely syncs .env files with Azure Key Vault using AES-256 encryption. It supports team collaboration through shared encryption keys and provides file watching capabilities for automatic synchronization.
+env-sync is a Go CLI tool that securely syncs .env files with Azure Key Vault using AES-256 encryption. It features intelligent conflict detection, robust file watching with atomic write support, and comprehensive team collaboration capabilities through shared encryption keys.
 
 ## Development Commands
 
 ### Building and Testing
 - `make build` - Build the binary to `bin/env-sync`
-- `make test` - Run all Go tests
+- `make test` - Run all Go tests (including conflict resolution tests)
 - `make lint` - Run golangci-lint for code quality checks
 - `make clean` - Remove build artifacts
 - `make install` - Install binary via `go install`
@@ -22,6 +22,7 @@ env-sync is a Go CLI tool that securely syncs .env files with Azure Key Vault us
 
 ### Development Workflow
 - `go test ./...` - Run tests in all packages
+- `go test ./internal/sync/...` - Run conflict resolution tests specifically
 - `go build -o bin/env-sync ./cmd/main.go` - Build manually
 - `./bin/env-sync doctor` - Check system health after building
 
@@ -44,8 +45,11 @@ env-sync is a Go CLI tool that securely syncs .env files with Azure Key Vault us
 - **Configuration System**: Uses Viper for YAML config files (`.env-sync.yaml`, `.env-sync.dev.yaml`, etc.)
 - **Encryption**: AES-256 encryption with team-shared keys (env var, file, or prompt-based)
 - **Azure Integration**: Uses Azure SDK for Key Vault operations with proper authentication
-- **File Watching**: fsnotify-based file monitoring with configurable push/pull modes
+- **Smart File Watching**: fsnotify-based monitoring with atomic write support and robust change detection
 - **Multi-Environment Support**: Separate config files for different environments (dev/qa/prod)
+- **Intelligent Conflict Detection**: Key-level conflict detection with diff display and multiple resolution strategies
+- **Enhanced Push Process**: Automatic conflict detection before every push with user confirmation prompts
+- **Debug Mode**: Comprehensive debug logging for troubleshooting file change detection issues
 
 ### Architecture Patterns
 The codebase follows Clean Architecture principles:
@@ -88,13 +92,42 @@ Each environment can have different vault URLs, secret names, encryption keys, a
 ## Common Operations
 
 ### File Watching Modes
-- **Pull-only mode** (default): `env-sync watch` - Safe for team environments
-- **Full sync mode**: `env-sync watch --push` - Pushes local changes, includes anti-cycle protection
+- **Safe mode** (default): `env-sync watch` - Pulls every 15min + manual push with conflict detection
+- **Auto-push mode**: `env-sync watch --confirm=false` - Automatic push with conflict detection
+- **Debug mode**: `env-sync watch --debug` - Detailed logging for troubleshooting file events
+- **Custom timing**: Configurable via `sync_interval` in config (default 15 minutes)
+
+### Conflict Resolution Strategies
+- **manual** (default): Interactive conflict resolution with user prompts
+- **local**: Local changes always win (remote changes discarded)
+- **remote**: Remote changes always win (local changes discarded)  
+- **merge**: Create conflict markers for manual resolution
+- **backup**: Create backups and prefer local changes
 
 ### Key Management
 - Encryption keys can be sourced from environment variables, files, or prompts
 - Support for key rotation with `rotate-key` command
 - Different keys per environment for security isolation
+
+### Conflict Detection & Resolution
+- **Intelligent Detection**: Key-level conflict detection that ignores non-overlapping changes
+- **Diff Display**: Shows exactly which keys conflict with local vs remote values
+- **Push Integration**: Automatic conflict detection before every push operation
+- **Multiple Strategies**: manual, local, remote, merge, backup resolution options
+- **Backup Creation**: Automatic timestamped backups in `.env-sync-backups/` when using backup strategy
+
+### User Confirmation System
+- **Push Confirmation**: Interactive prompts before pushing: `🚀 Push changes to remote? [y/N]:`
+- **Conflict Confirmation**: Special prompts when conflicts detected with diff display
+- **Safety-first Defaults**: Confirmation required unless explicitly disabled with `--confirm=false`
+- **Graceful Handling**: Clear feedback when pushes are declined by user
+
+### File Change Detection
+- **Atomic Write Support**: Handles all modern editors (VS Code, vim, nano, etc.)
+- **Multiple Changes**: Detects every consecutive file change, not just the first one
+- **Smart Timing**: Prevents pull-triggered pushes while catching legitimate changes
+- **Health Checks**: Periodic verification that file watcher is still active
+- **Debug Logging**: Comprehensive event logging with `--debug` flag for troubleshooting
 
 ### Health Diagnostics
 The `doctor` command provides comprehensive system health checks for Azure CLI, Tilt, authentication, and configuration validation.

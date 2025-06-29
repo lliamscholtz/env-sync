@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/lliamscholtz/env-sync/internal/config"
 	"github.com/lliamscholtz/env-sync/internal/crypto"
 	"github.com/lliamscholtz/env-sync/internal/deps"
+	"github.com/lliamscholtz/env-sync/internal/sync"
 	"github.com/lliamscholtz/env-sync/internal/utils"
 	"github.com/lliamscholtz/env-sync/internal/vault"
 	"github.com/lliamscholtz/env-sync/internal/watcher"
@@ -114,7 +117,9 @@ func init() {
 	rotateKeyCmd.MarkFlagRequired("new-key")
 
 	// 'watch' command flags
-	watchCmd.Flags().Bool("push", false, "Enable push on file changes (default: false, periodic pull only)")
+	watchCmd.Flags().Bool("push", true, "Enable push on file changes (default: true, with confirmation prompts)")
+	watchCmd.Flags().Bool("confirm", true, "Prompt for confirmation before pushing changes (default: true)")
+	watchCmd.Flags().Bool("debug", false, "Enable debug logging for troubleshooting file change detection")
 }
 
 func main() {
@@ -347,12 +352,14 @@ Use --sync-file to create a configuration file with a custom name:
 
 		// 4. Create and write the configuration file
 		finalConfig := &config.Config{
-			VaultURL:     vaultURL,
-			SecretName:   secretName,
-			EnvFile:      envFile,
-			SyncInterval: 15 * time.Minute,
-			KeySource:    keySource,
-			KeyFile:      keyFile,
+			VaultURL:         vaultURL,
+			SecretName:       secretName,
+			EnvFile:          envFile,
+			SyncInterval:     15 * time.Minute,
+			KeySource:        keySource,
+			KeyFile:          keyFile,
+			ConflictStrategy: "manual",
+			AutoBackup:       false,
 		}
 		
 		configFileName := getConfigFile()
@@ -542,48 +549,7 @@ uploads it as a new secret version to the specified Azure Key Vault.
 Use --sync-file to specify a different configuration file:
   env-sync push --sync-file .env-sync.dev.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadConfig(getConfigFile())
-		if err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-
-		// Read the .env file
-		envData, err := os.ReadFile(cfg.EnvFile)
-		if err != nil {
-			return fmt.Errorf("failed to read .env file from '%s': %w", cfg.EnvFile, err)
-		}
-
-		// Get the encryption key
-		key, err := cfg.LoadAndValidateKey(cliKey)
-		if err != nil {
-			return fmt.Errorf("failed to load encryption key: %w", err)
-		}
-
-		// Encrypt the .env file content
-		encrypted, err := crypto.EncryptEnvContent(envData, key)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt .env file: %w", err)
-		}
-
-		// Create Azure credentials
-		cred, err := auth.CreateAzureCredential()
-		if err != nil {
-			return fmt.Errorf("failed to create Azure credentials: %w", err)
-		}
-
-		// Store the encrypted content in Azure Key Vault
-		vaultClient, err := vault.NewClient(cfg.VaultURL, cred)
-		if err != nil {
-			return fmt.Errorf("failed to create Key Vault client: %w", err)
-		}
-
-		utils.PrintInfo("🔒 Pushing encrypted content to Azure Key Vault...\n")
-		if err := vaultClient.StoreSecret(context.Background(), cfg.SecretName, encrypted); err != nil {
-			return fmt.Errorf("failed to store secret in Key Vault: %w", err)
-		}
-
-		utils.PrintSuccess("✅ Successfully pushed encrypted .env file to Azure Key Vault.\n")
-		return nil
+		return pushWithConflictDetection(cmd, args, false) // false = not from watcher
 	},
 }
 
@@ -647,12 +613,18 @@ var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Monitor the .env file and automatically sync on changes",
 	Long: `Starts a long-running process that watches the local .env file for modifications.
-By default, only periodic pulls are performed to sync remote changes to your local .env file.
-Use --push flag to enable automatic pushes when local file changes are detected.
-The watcher performs periodic pulls at a configurable interval.
+
+By default, pushes are enabled with confirmation prompts for safety.
+Use --push=false to disable pushes and only perform periodic pulls.
+Use --confirm flag to control whether you're prompted before each push (default: true).
+
+The watcher performs periodic pulls at a configurable interval and pushes on file changes.
 
 Use --sync-file to specify a different configuration file:
-  env-sync watch --sync-file .env-sync.prod.yaml --push`,
+  env-sync watch --sync-file .env-sync.prod.yaml
+  env-sync watch --push=false             # Pull-only mode  
+  env-sync watch --confirm=false          # Auto-push without prompts
+  env-sync watch --debug                  # Enable debug logging for troubleshooting`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadConfig(getConfigFile())
 		if err != nil {
@@ -662,8 +634,16 @@ Use --sync-file to specify a different configuration file:
 			return err
 		}
 
-		// Get the push flag
+		// Get the push, confirm, and debug flags
 		enablePush, _ := cmd.Flags().GetBool("push")
+		confirmPush, _ := cmd.Flags().GetBool("confirm")
+		debugMode, _ := cmd.Flags().GetBool("debug")
+		
+		// Enable debug logging if requested
+		if debugMode {
+			utils.SetDebugMode(true)
+			utils.PrintDebug("🐛 Debug mode enabled for file watcher\n")
+		}
 
 		// Ensure the .env file exists before starting the watcher
 		if _, err := os.Stat(cfg.EnvFile); os.IsNotExist(err) {
@@ -686,10 +666,8 @@ Use --sync-file to specify a different configuration file:
 		}()
 
 		pushFunc := func() error {
-			// Create a new command to avoid flag parsing issues in a loop
-			pushCmd_instance := &cobra.Command{}
-			*pushCmd_instance = *pushCmd
-			return pushCmd_instance.RunE(cmd, args)
+			// Use the enhanced push function with conflict detection
+			return pushWithConflictDetection(cmd, args, true) // true = from watcher
 		}
 
 		pullFunc := func() error {
@@ -706,7 +684,7 @@ Use --sync-file to specify a different configuration file:
 			syncInterval = 15 * time.Minute
 		}
 
-		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc, pullFunc, enablePush)
+		w, err := watcher.NewFileWatcher(cfg.EnvFile, syncInterval, debounceTime, pushFunc, pullFunc, enablePush, confirmPush)
 		if err != nil {
 			return fmt.Errorf("failed to create file watcher: %w", err)
 		}
@@ -882,4 +860,208 @@ Use --sync-file to specify a different configuration file:
 		utils.PrintInfo("🔧 They will need to update their key source (e.g., ENVSYNC_ENCRYPTION_KEY) before they can 'pull' again.\n")
 		return nil
 	},
+}
+
+// pushWithConflictDetection performs a push operation with conflict detection and resolution
+func pushWithConflictDetection(cmd *cobra.Command, args []string, fromWatcher bool) error {
+	cfg, err := config.LoadConfig(getConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Get the encryption key
+	key, err := cfg.LoadAndValidateKey(cliKey)
+	if err != nil {
+		return fmt.Errorf("failed to load encryption key: %w", err)
+	}
+
+	// Create Azure credentials and vault client
+	cred, err := auth.CreateAzureCredential()
+	if err != nil {
+		return fmt.Errorf("failed to create Azure credentials: %w", err)
+	}
+
+	vaultClient, err := vault.NewClient(cfg.VaultURL, cred)
+	if err != nil {
+		return fmt.Errorf("failed to create Key Vault client: %w", err)
+	}
+
+	ctx := context.Background()
+
+	// Read the current local .env file
+	localContent, err := os.ReadFile(cfg.EnvFile)
+	if err != nil {
+		return fmt.Errorf("failed to read .env file from '%s': %w", cfg.EnvFile, err)
+	}
+
+	// Try to get the current remote version to check for conflicts
+	var remoteContent []byte
+	var hasRemote bool
+	
+	if encrypted, err := vaultClient.GetSecret(ctx, cfg.SecretName); err == nil {
+		if decrypted, err := crypto.DecryptEnvContent(encrypted, key); err == nil {
+			remoteContent = decrypted
+			hasRemote = true
+		} else {
+			utils.PrintWarning("⚠️ Could not decrypt remote content (possible key mismatch), proceeding with push...\n")
+		}
+	} else {
+		utils.PrintInfo("ℹ️ No remote version found, this will be the first push.\n")
+	}
+
+	// Check for conflicts if we have both local and remote content
+	if hasRemote && len(remoteContent) > 0 {
+		// Create conflict resolver
+		conflictStrategy := sync.ConflictStrategyManual
+		if cfg.ConflictStrategy != "" {
+			switch cfg.ConflictStrategy {
+			case "local":
+				conflictStrategy = sync.ConflictStrategyLocal
+			case "remote":
+				conflictStrategy = sync.ConflictStrategyRemote
+			case "merge":
+				conflictStrategy = sync.ConflictStrategyMerge
+			case "backup":
+				conflictStrategy = sync.ConflictStrategyBackup
+			}
+		}
+
+		// For push operations, we want to detect actual key conflicts, not just content differences
+		// We'll check if local and remote have different values for the same keys
+		localEnv, err := parseEnvContentForPush(string(localContent))
+		if err != nil {
+			return fmt.Errorf("failed to parse local .env content: %w", err)
+		}
+		
+		remoteEnv, err := parseEnvContentForPush(string(remoteContent))
+		if err != nil {
+			return fmt.Errorf("failed to parse remote .env content: %w", err)
+		}
+		
+		// Find actual conflicts (same key, different values)
+		var conflictingKeys []string
+		for key, localValue := range localEnv {
+			if remoteValue, exists := remoteEnv[key]; exists && localValue != remoteValue {
+				conflictingKeys = append(conflictingKeys, key)
+			}
+		}
+		
+		var conflict *ConflictInfo
+		if len(conflictingKeys) > 0 {
+			conflict = &ConflictInfo{
+				ConflictTime:  time.Now(),
+				LocalChanges:  localEnv,
+				RemoteChanges: remoteEnv,
+				Conflicts:     conflictingKeys,
+			}
+		}
+
+		if conflict != nil {
+			utils.PrintWarning("⚠️ Conflict detected! Remote version has different values.\n\n")
+			
+			// Show the conflicts
+			utils.PrintInfo("🔍 Conflicting keys:\n")
+			for _, key := range conflict.Conflicts {
+				localValue := conflict.LocalChanges[key]
+				remoteValue := conflict.RemoteChanges[key]
+				utils.PrintInfo("  • %s:\n", key)
+				utils.PrintInfo("    Local:  %s\n", localValue)
+				utils.PrintInfo("    Remote: %s\n", remoteValue)
+			}
+			utils.PrintInfo("\n")
+
+			// Ask user what to do
+			if fromWatcher {
+				// In watcher mode, respect the configured strategy or ask
+				if conflictStrategy == sync.ConflictStrategyManual {
+					if !promptUserForConflictResolution("Push with local changes") {
+						utils.PrintInfo("⏭️ Push cancelled by user.\n")
+						return nil
+					}
+				} else {
+					utils.PrintInfo("🔧 Using configured conflict strategy: %s\n", cfg.ConflictStrategy)
+				}
+			} else {
+				// In manual push mode, always ask for confirmation
+				if !promptUserForConflictResolution("Push with local changes (this will overwrite remote)") {
+					utils.PrintInfo("⏭️ Push cancelled by user.\n")
+					return nil
+				}
+			}
+		} else {
+			utils.PrintInfo("✅ No conflicts detected with remote version.\n")
+		}
+	}
+
+	// Proceed with the push
+	encrypted, err := crypto.EncryptEnvContent(localContent, key)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt .env file: %w", err)
+	}
+
+	utils.PrintInfo("🔒 Pushing encrypted content to Azure Key Vault...\n")
+	if err := vaultClient.StoreSecret(ctx, cfg.SecretName, encrypted); err != nil {
+		return fmt.Errorf("failed to store secret in Key Vault: %w", err)
+	}
+
+	return nil
+}
+
+// promptUserForConflictResolution prompts the user to confirm an action when conflicts exist
+func promptUserForConflictResolution(action string) bool {
+	fmt.Printf("\n🚀 %s? [y/N]: ", action)
+	
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		utils.PrintError("❌ Error reading input: %v\n", err)
+		return false
+	}
+	
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
+}
+
+// ConflictInfo represents information about a detected conflict
+type ConflictInfo struct {
+	ConflictTime  time.Time
+	LocalChanges  map[string]string
+	RemoteChanges map[string]string
+	Conflicts     []string
+}
+
+// parseEnvContentForPush parses .env content into key-value pairs for conflict detection
+func parseEnvContentForPush(content string) (map[string]string, error) {
+	env := make(map[string]string)
+	lines := strings.Split(content, "\n")
+	
+	for lineNum, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		// Find the first = sign
+		equalIndex := strings.Index(line, "=")
+		if equalIndex == -1 {
+			return nil, fmt.Errorf("invalid .env format at line %d: missing '=' in '%s'", lineNum+1, line)
+		}
+		
+		key := strings.TrimSpace(line[:equalIndex])
+		value := line[equalIndex+1:] // Keep the value as-is (including quotes)
+		
+		// Remove surrounding quotes if present
+		if len(value) >= 2 {
+			if (value[0] == '"' && value[len(value)-1] == '"') ||
+			   (value[0] == '\'' && value[len(value)-1] == '\'') {
+				value = value[1 : len(value)-1]
+			}
+		}
+		
+		env[key] = value
+	}
+	
+	return env, nil
 }

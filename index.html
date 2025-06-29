@@ -444,6 +444,127 @@
                 line-height: 1.6;
             }
 
+            /* Conflict Resolution Demo Section */
+            .conflict-demo {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+
+            .demo-scenario {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                border-radius: 16px;
+                padding: 2.5rem;
+                box-shadow: var(--shadow-secondary);
+                backdrop-filter: blur(12px);
+            }
+
+            .demo-scenario h3 {
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+                font-size: 1.4rem;
+            }
+
+            .demo-scenario p {
+                color: var(--text-secondary);
+                margin-bottom: 1.5rem;
+            }
+
+            .conflict-output {
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border-secondary);
+                border-radius: 12px;
+                padding: 1.5rem;
+                margin: 1.5rem 0;
+                font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
+                font-size: 0.9rem;
+                line-height: 1.6;
+            }
+
+            .conflict-header {
+                color: #fbbf24;
+                font-weight: 600;
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .conflict-title {
+                color: var(--accent-primary);
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+
+            .conflict-item {
+                margin-left: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .conflict-key {
+                color: var(--text-primary);
+                font-weight: 600;
+                margin-bottom: 0.25rem;
+            }
+
+            .conflict-values {
+                margin-left: 1rem;
+            }
+
+            .local-value {
+                color: #10b981;
+                margin-bottom: 0.25rem;
+            }
+
+            .remote-value {
+                color: #ef4444;
+            }
+
+            .conflict-values .value {
+                background: var(--bg-primary);
+                padding: 0.2rem 0.5rem;
+                border-radius: 4px;
+                color: var(--text-primary);
+            }
+
+            .conflict-prompt {
+                color: var(--accent-secondary);
+                font-weight: 600;
+                margin-top: 1rem;
+                padding-top: 1rem;
+                border-top: 1px solid var(--border-secondary);
+            }
+
+            .resolution-strategies {
+                margin-top: 2rem;
+            }
+
+            .resolution-strategies h4 {
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+                font-size: 1.2rem;
+            }
+
+            .strategy-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+            }
+
+            .strategy-item {
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border-secondary);
+                border-radius: 8px;
+                padding: 1rem;
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+            }
+
+            .strategy-item strong {
+                color: var(--accent-primary);
+                font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
+            }
+
             /* Setup Section */
             .setup-steps {
                 background: var(--bg-secondary);
@@ -932,11 +1053,12 @@
                             </p>
                         </div>
                         <div class="feature-card">
-                            <div class="feature-icon">🏥</div>
-                            <h3 class="feature-title">Health Monitoring</h3>
+                            <div class="feature-icon">⚡</div>
+                            <h3 class="feature-title">Smart Conflict Resolution</h3>
                             <p>
-                                Built-in diagnostics and dependency management ensure
-                                your sync setup is always working correctly.
+                                Smart conflict detection shows exactly which keys
+                                differ, with multiple resolution strategies and
+                                automatic diff display.
                             </p>
                         </div>
                         <div class="feature-card">
@@ -954,6 +1076,86 @@
                                 Separate configurations for dev, staging, and
                                 production with isolated encryption keys.
                             </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Conflict Resolution Demo Section -->
+                <section
+                    id="conflict-resolution"
+                    class="section"
+                >
+                    <h2 class="section-title">Smart Conflict Resolution</h2>
+                    <p class="section-subtitle">
+                        See how env-sync handles team conflicts automatically
+                    </p>
+
+                    <div class="conflict-demo">
+                        <div class="demo-scenario">
+                            <h3>When Team Members Edit the Same Key</h3>
+                            <p>
+                                env-sync detects exactly which keys conflict and
+                                shows you the differences:
+                            </p>
+
+                            <div class="conflict-output">
+                                <div class="conflict-header">
+                                    ⚠️ Conflict detected! Remote version has
+                                    different values.
+                                </div>
+                                <div class="conflict-details">
+                                    <div class="conflict-section">
+                                        <div class="conflict-title">
+                                            🔍 Conflicting keys:
+                                        </div>
+                                        <div class="conflict-item">
+                                            <div class="conflict-key">
+                                                • API_KEY:
+                                            </div>
+                                            <div class="conflict-values">
+                                                <div class="local-value">
+                                                    Local:
+                                                    <span class="value"
+                                                        >user_alice_key_v2</span
+                                                    >
+                                                </div>
+                                                <div class="remote-value">
+                                                    Remote:
+                                                    <span class="value"
+                                                        >user_bob_key_v3</span
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="conflict-prompt">
+                                        🚀 Push with local changes (this will
+                                        overwrite remote)? [y/N]:
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="resolution-strategies">
+                                <h4>Multiple Resolution Strategies</h4>
+                                <div class="strategy-grid">
+                                    <div class="strategy-item">
+                                        <strong>manual</strong> - Ask user for
+                                        confirmation (safe default)
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>backup</strong> - Create timestamped
+                                        backups and use local
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>local</strong> - Always use local
+                                        changes
+                                    </div>
+                                    <div class="strategy-item">
+                                        <strong>remote</strong> - Always use remote
+                                        changes
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -996,9 +1198,8 @@
                                     Automatically install Azure CLI and verify your
                                     setup:
                                 </p>
-                                <div class="code-block">
-                                    env-sync install-deps env-sync doctor
-                                </div>
+                                <div class="code-block">env-sync install-deps</div>
+                                <div class="code-block">env-sync doctor</div>
                             </div>
                         </div>
 
@@ -1037,13 +1238,12 @@
                                     Push your initial .env file and start file
                                     watching:
                                 </p>
-                                <div class="code-block">
-                                    env-sync push env-sync watch
-                                </div>
+                                <div class="code-block">env-sync push</div>
                                 <p>
                                     Your .env file is now securely synced with Azure
                                     Key Vault!
                                 </p>
+                                <div class="code-block">env-sync watch</div>
                             </div>
                         </div>
                     </div>

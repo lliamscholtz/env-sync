@@ -6,10 +6,13 @@
 
 -   🔐 **Secure Encryption**: AES-256 encryption for all .env data
 -   🔑 **Team Key Sharing**: Share encryption keys securely across team members
--   📁 **File Watching**: Automatic sync with configurable push/pull modes
+-   📁 **Smart File Watching**: Automatic sync with atomic write support and robust change detection
+-   ⚡ **Conflict Detection**: Intelligent conflict resolution with diff display and multiple strategies
+-   🛡️ **Safe Defaults**: Confirmation prompts and manual conflict resolution by default
 -   🏥 **Health Monitoring**: Built-in diagnostics and dependency management
 -   🔄 **Key Rotation**: Easy encryption key rotation for security maintenance
 -   🐳 **Tilt Integration**: Seamless integration with Tilt development workflows
+-   🐛 **Debug Mode**: Comprehensive debug logging for troubleshooting file changes
 
 ## 🚀 Quick Start
 
@@ -140,12 +143,13 @@ env-sync pull
 # Make changes to .env file
 # ...
 
-# Push changes to team
+# Push changes to team (now includes conflict detection)
 env-sync push
 
 # Or use file watcher for automatic sync
-env-sync watch           # Pull-only mode (safe default)
-env-sync watch --push    # Full sync mode (pull + push on changes)
+env-sync watch                    # Safe mode: pulls + manual push confirmation
+env-sync watch --confirm=false   # Auto-push without confirmation  
+env-sync watch --debug          # Enable debug logging for troubleshooting
 ```
 
 **Multi-Environment:**
@@ -153,11 +157,12 @@ env-sync watch --push    # Full sync mode (pull + push on changes)
 ```bash
 # Work with specific environments
 env-sync pull --sync-file .env-sync.dev.yaml     # Pull dev changes
-env-sync push --sync-file .env-sync.dev.yaml     # Push dev changes
+env-sync push --sync-file .env-sync.dev.yaml     # Push dev changes (with conflict detection)
 
-# Watch specific environment
-env-sync watch --sync-file .env-sync.dev.yaml    # Watch dev environment
-env-sync watch --sync-file .env-sync.qa.yaml --push  # Watch QA with push enabled
+# Watch specific environment with different conflict strategies
+env-sync watch --sync-file .env-sync.dev.yaml    # Manual conflict resolution (safe)
+env-sync watch --sync-file .env-sync.qa.yaml     # Automatic backups on conflicts
+env-sync watch --sync-file .env-sync.prod.yaml --confirm=false  # Auto-push for CI/CD
 
 # Check status of different environments
 env-sync status --sync-file .env-sync.dev.yaml
@@ -215,30 +220,44 @@ env-sync status --sync-file .env-sync.dev.yaml   # Check dev status
 -   🏗️ **Team Workflows**: Different team members can work on different environments
 -   📁 **Project Organization**: Keep environment-specific settings organized
 
-### File Watcher Modes
+### File Watcher Features
 
-The `watch` command supports two modes:
+The `watch` command includes intelligent conflict detection and robust file change monitoring:
 
-**Pull-Only Mode (Default - Recommended for most teams)**
-
-```bash
-env-sync watch
-```
-
--   ⬇️ Automatically pulls changes from Azure Key Vault every 15 minutes
--   🛡️ Ignores local file changes (prevents accidental overwrites)
--   🔒 Safe for team environments where multiple people might edit
-
-**Full Sync Mode (Advanced)**
+**Smart Conflict Detection**
 
 ```bash
-env-sync watch --push
+env-sync watch                    # Manual conflict resolution with diff display
+env-sync watch --confirm=false   # Auto-push with conflict detection
 ```
 
--   ⬇️ Pulls changes from Azure Key Vault every 15 minutes
--   ⬆️ Pushes local changes to Azure Key Vault when .env file is modified
--   ⚠️ Includes anti-cycle protection to prevent sync loops
--   👥 Best for single-person workflows or when you're the primary editor
+-   🔍 **Conflict Detection**: Automatically detects when multiple users modify the same keys
+-   📊 **Diff Display**: Shows exactly which keys conflict with local vs remote values
+-   🛡️ **Safe Defaults**: Always asks for confirmation before overwriting remote changes
+-   ⚡ **Real Conflicts Only**: Ignores non-overlapping changes (different keys)
+
+**Robust File Monitoring**
+
+```bash
+env-sync watch --debug          # Enable debug logging
+```
+
+-   📁 **Atomic Write Support**: Handles all editor types (VS Code, vim, nano, etc.)
+-   🔄 **Multiple Changes**: Detects every file change, not just the first one
+-   🕐 **Smart Timing**: Prevents pull-triggered pushes while catching real changes
+-   🎯 **Reliable Detection**: Automatically re-establishes file watching if needed
+
+**Conflict Resolution Strategies**
+
+Configure automatic conflict resolution in your `.env-sync.yaml`:
+
+```yaml
+conflict_strategy: "manual"    # Ask user (safe default)
+conflict_strategy: "backup"    # Create backups and use local
+conflict_strategy: "local"     # Always use local changes
+conflict_strategy: "remote"    # Always use remote changes  
+conflict_strategy: "merge"     # Create merge conflict file
+```
 
 ### Key Management
 
@@ -342,14 +361,30 @@ env_sync(
 5. **File Watcher Issues**
 
     ```bash
+    # Enable debug mode to see detailed file events
+    env-sync watch --debug
+
     # If watcher seems stuck or not responding
     env-sync pull  # Manual pull to verify connectivity
 
     # Check file permissions
     ls -la .env
 
-    # Restart with verbose output
-    env-sync watch --push  # or just 'env-sync watch'
+    # Test with different editors if changes aren't detected
+    echo "TEST_KEY=new_value" >> .env  # Direct file write test
+    ```
+
+6. **Conflict Detection Issues**
+
+    ```bash
+    # Test conflict detection manually
+    env-sync push  # Will show conflicts if any exist
+
+    # Check current conflict strategy
+    cat .env-sync.yaml | grep conflict_strategy
+
+    # Change conflict strategy for testing
+    env-sync init  # Recreate config with manual strategy
     ```
 
 ### System Diagnostics
@@ -380,6 +415,8 @@ env_file: .env
 sync_interval: 15m
 key_source: env # env, file, or prompt
 key_file: .env-sync-key # only if key_source is "file"
+conflict_strategy: manual # manual, local, remote, merge, backup
+auto_backup: false # enable automatic backups on conflicts
 ```
 
 ### Multiple Configuration Files
@@ -394,6 +431,8 @@ secret_name: myapp-dev-env
 env_file: .env.dev
 sync_interval: 15m
 key_source: env
+conflict_strategy: manual    # Safe for development
+auto_backup: true           # Keep backup history
 ```
 
 **`.env-sync.qa.yaml`:**
@@ -405,6 +444,8 @@ env_file: .env.qa
 sync_interval: 30m
 key_source: file
 key_file: .env-sync-qa-key
+conflict_strategy: backup   # Automatic with backups
+auto_backup: true
 ```
 
 **`.env-sync.prod.yaml`:**
@@ -416,6 +457,8 @@ env_file: .env.prod
 sync_interval: 60m
 key_source: file
 key_file: .env-sync-prod-key
+conflict_strategy: manual   # Extra caution for production
+auto_backup: true
 ```
 
 ### Configuration Priority

@@ -15,12 +15,14 @@ import (
 
 // Config holds the application's configuration.
 type Config struct {
-	VaultURL     string        `yaml:"vault_url" mapstructure:"vault_url"`
-	SecretName   string        `yaml:"secret_name" mapstructure:"secret_name"`
-	EnvFile      string        `yaml:"env_file" mapstructure:"env_file"`
-	SyncInterval time.Duration `yaml:"sync_interval" mapstructure:"sync_interval"`
-	KeySource    string        `yaml:"key_source" mapstructure:"key_source"` // "env", "file", "prompt"
-	KeyFile      string        `yaml:"key_file" mapstructure:"key_file"`   // Path to key file if key_source is "file"
+	VaultURL         string        `yaml:"vault_url" mapstructure:"vault_url"`
+	SecretName       string        `yaml:"secret_name" mapstructure:"secret_name"`
+	EnvFile          string        `yaml:"env_file" mapstructure:"env_file"`
+	SyncInterval     time.Duration `yaml:"sync_interval" mapstructure:"sync_interval"`
+	KeySource        string        `yaml:"key_source" mapstructure:"key_source"` // "env", "file", "prompt"
+	KeyFile          string        `yaml:"key_file" mapstructure:"key_file"`   // Path to key file if key_source is "file"
+	ConflictStrategy string        `yaml:"conflict_strategy" mapstructure:"conflict_strategy"` // "manual", "local", "remote", "merge", "backup"
+	AutoBackup       bool          `yaml:"auto_backup" mapstructure:"auto_backup"` // Enable automatic backups on conflicts
 }
 
 // LoadConfig loads the configuration from the given file path.
@@ -58,6 +60,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.EnvFile == "" {
 		cfg.EnvFile = ".env"
+	}
+	if cfg.ConflictStrategy == "" {
+		cfg.ConflictStrategy = "manual" // Safe default
 	}
 
 	// Validate the final configuration

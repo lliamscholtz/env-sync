@@ -7,9 +7,16 @@ import (
 	"github.com/fatih/color"
 )
 
-// IsDebug returns true if the ENVSYNC_DEBUG environment variable is set.
+var debugMode bool
+
+// IsDebug returns true if the ENVSYNC_DEBUG environment variable is set or debug mode is enabled.
 func IsDebug() bool {
-	return os.Getenv("ENVSYNC_DEBUG") != ""
+	return debugMode || os.Getenv("ENVSYNC_DEBUG") != ""
+}
+
+// SetDebugMode enables or disables debug mode programmatically.
+func SetDebugMode(enabled bool) {
+	debugMode = enabled
 }
 
 // PrintDebug prints a debug message if debugging is enabled.
